@@ -115,7 +115,7 @@
 }
 
 .form-textarea {
-  @apply input-field resize-vertical;
+  @apply input-field resize-y;
 }
 
 .form-error {
