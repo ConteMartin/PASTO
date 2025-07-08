@@ -1,0 +1,319 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* Animaciones personalizadas */
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+}
+
+/* Componentes personalizados */
+@layer components {
+  .btn-primary {
+    @apply bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 ease-in-out;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-lg transition duration-200 ease-in-out;
+  }
+  
+  .input-field {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition duration-200;
+  }
+  
+  .card {
+    @apply bg-white rounded-lg shadow-md p-6 border border-gray-100;
+  }
+  
+  .status-badge {
+    @apply px-3 py-1 rounded-full text-sm font-medium;
+  }
+  
+  .status-pending {
+    @apply bg-yellow-100 text-yellow-800;
+  }
+  
+  .status-accepted {
+    @apply bg-blue-100 text-blue-800;
+  }
+  
+  .status-in-progress {
+    @apply bg-green-100 text-green-800;
+  }
+  
+  .status-completed {
+    @apply bg-green-100 text-green-800;
+  }
+  
+  .status-cancelled {
+    @apply bg-red-100 text-red-800;
+  }
+}
+
+/* Estilos para el loading spinner */
+.loading-spinner {
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #16a34a;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Gradientes personalizados */
+.gradient-green {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+}
+
+.gradient-green-light {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+}
+
+/* Estilos para mobile-first */
+@media (max-width: 640px) {
+  .mobile-padding {
+    @apply px-4 py-2;
+  }
+  
+  .mobile-text {
+    @apply text-sm;
+  }
+  
+  .mobile-button {
+    @apply py-3 px-4 text-base;
+  }
+}
+
+/* Estilos para formularios */
+.form-group {
+  @apply mb-4;
+}
+
+.form-label {
+  @apply block text-sm font-medium text-gray-700 mb-1;
+}
+
+.form-input {
+  @apply input-field;
+}
+
+.form-select {
+  @apply input-field cursor-pointer;
+}
+
+.form-textarea {
+  @apply input-field resize-vertical;
+}
+
+.form-error {
+  @apply text-red-600 text-sm mt-1;
+}
+
+.form-success {
+  @apply text-green-600 text-sm mt-1;
+}
+
+/* Estilos para notificaciones */
+.notification {
+  @apply fixed top-4 right-4 z-50 max-w-sm w-full;
+}
+
+.notification-success {
+  @apply bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded;
+}
+
+.notification-error {
+  @apply bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded;
+}
+
+.notification-warning {
+  @apply bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded;
+}
+
+/* Efectos hover mejorados */
+.hover-scale {
+  @apply transition-transform duration-200 ease-in-out;
+}
+
+.hover-scale:hover {
+  @apply scale-105;
+}
+
+/* Estilos para mapas (preparado para Google Maps) */
+.map-container {
+  @apply w-full h-64 rounded-lg overflow-hidden border border-gray-300;
+}
+
+.map-overlay {
+  @apply absolute top-2 left-2 right-2 bg-white bg-opacity-90 p-2 rounded-lg text-sm;
+}
+
+/* Estilos para galería de imágenes */
+.image-gallery {
+  @apply grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4;
+}
+
+.image-item {
+  @apply relative aspect-square rounded-lg overflow-hidden border border-gray-200 hover:border-green-500 transition-colors;
+}
+
+.image-item img {
+  @apply w-full h-full object-cover;
+}
+
+.image-overlay {
+  @apply absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity;
+}
+
+/* Estilos para rating/calificación */
+.rating-stars {
+  @apply flex space-x-1;
+}
+
+.rating-star {
+  @apply w-5 h-5 cursor-pointer transition-colors;
+}
+
+.rating-star.filled {
+  @apply text-yellow-400;
+}
+
+.rating-star.empty {
+  @apply text-gray-300;
+}
+
+/* Estilos para tabs */
+.tab-nav {
+  @apply flex border-b border-gray-200;
+}
+
+.tab-button {
+  @apply py-3 px-4 text-center border-b-2 border-transparent hover:text-gray-800 hover:border-gray-300 transition-colors;
+}
+
+.tab-button.active {
+  @apply text-green-700 border-green-600 bg-green-50;
+}
+
+/* Estilos para progress bar */
+.progress-bar {
+  @apply w-full bg-gray-200 rounded-full h-2;
+}
+
+.progress-fill {
+  @apply bg-green-600 h-2 rounded-full transition-all duration-300;
+}
+
+/* Estilos para drawer/sidebar */
+.drawer {
+  @apply fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out;
+}
+
+.drawer.closed {
+  @apply -translate-x-full;
+}
+
+.drawer-overlay {
+  @apply fixed inset-0 bg-black bg-opacity-50 z-40;
+}
+
+/* Utilidades de espaciado específicas para mobile */
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Estilos para botones flotantes */
+.fab {
+  @apply fixed bottom-6 right-6 w-14 h-14 bg-green-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-green-700 transition-colors z-40;
+}
+
+/* Animaciones de entrada */
+.fade-in {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+.slide-down {
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    transform: translateY(20px); 
+    opacity: 0; 
+  }
+  to { 
+    transform: translateY(0); 
+    opacity: 1; 
+  }
+}
+
+@keyframes slideDown {
+  from { 
+    transform: translateY(-20px); 
+    opacity: 0; 
+  }
+  to { 
+    transform: translateY(0); 
+    opacity: 1; 
+  }
+}
+
+/* Responsive breakpoints personalizados */
+@media (min-width: 640px) {
+  .sm-custom {
+    /* Estilos para tablets pequeñas */
+  }
+}
+
+@media (min-width: 768px) {
+  .md-custom {
+    /* Estilos para tablets */
+  }
+}
+
+@media (min-width: 1024px) {
+  .lg-custom {
+    /* Estilos para desktop */
+  }
+}
+
+/* Estilos para dark mode (preparado para futura implementación) */
+@media (prefers-color-scheme: dark) {
+  .dark-mode {
+    @apply bg-gray-900 text-white;
+  }
+  
+  .dark-mode .card {
+    @apply bg-gray-800 border-gray-700;
+  }
+  
+  .dark-mode .input-field {
+    @apply bg-gray-700 border-gray-600 text-white;
+  }
+}
