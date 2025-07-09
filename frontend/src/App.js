@@ -1,22 +1,36 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useSpring, animated } from 'react-spring';
+import { Transition } from '@headlessui/react';
 import axios from 'axios';
 import { 
-  User, MapPin, Star, Camera, Bell, Settings, Home, Calendar, Clock, DollarSign, 
-  CheckCircle, XCircle, AlertCircle, Phone, Mail, Tool, Briefcase, Award, 
-  Navigation, MessageCircle, Plus, Filter, Search, RefreshCw, Send, ArrowLeft, 
-  ChevronRight, ChevronDown, ImageIcon, X, Check, Eye, EyeOff, Lock, 
-  Scissors, TreePine, Sparkles, Leaf, Shield, Smartphone, Menu, Star as StarIcon
+  User, MapPin, Star, Camera, Bell, Settings, Search, Filter, 
+  LogOut, Plus, Check, Clock, Car, Wrench, Scissors, Broom, 
+  Leaf, DollarSign, Home, Briefcase, UserCheck, CheckCircle,
+  AlertCircle, XCircle, Eye, EyeOff, Mail, Phone, Calendar,
+  ChevronRight, ChevronDown, Menu, X, Heart, Shield, Zap,
+  ArrowRight, ArrowLeft, RefreshCw, Download, Upload, Share2,
+  MessageCircle, ThumbsUp, Award, Target, Truck, Clock3,
+  PlayCircle, PauseCircle, StopCircle, RotateCcw, Send,
+  Edit, Trash2, Copy, ExternalLink, Info, HelpCircle
 } from 'lucide-react';
-import './App.css';
 
-// Configuración de axios
+// Configuración de axios con la URL del backend
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
-axios.defaults.baseURL = API_BASE_URL;
 
-// Interceptor para tokens
-axios.interceptors.request.use(
+// Configurar axios
+const axiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Interceptor para agregar token a las peticiones
+axiosInstance.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');
     if (token) {
@@ -27,994 +41,1219 @@ axios.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Componentes reutilizables optimizados
-const Toast = ({ message, type = 'success', onClose }) => {
-  useEffect(() => {
-    const timer = setTimeout(onClose, 3000);
-    return () => clearTimeout(timer);
-  }, [onClose]);
-
-  const styles = {
-    success: 'bg-green-500',
-    error: 'bg-red-500',
-    info: 'bg-blue-500'
-  };
-
-  return (
-    <div className={`fixed top-4 right-4 ${styles[type]} text-white px-6 py-3 rounded-lg shadow-lg z-50`}>
-      <div className="flex items-center space-x-2">
-        {type === 'success' && <CheckCircle className="w-5 h-5" />}
-        {type === 'error' && <XCircle className="w-5 h-5" />}
-        {type === 'info' && <AlertCircle className="w-5 h-5" />}
-        <span>{message}</span>
-        <button onClick={onClose} className="ml-2 hover:opacity-70">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
-  );
-};
-
-const Loading = ({ size = 'md' }) => {
-  const sizeClass = size === 'sm' ? 'w-4 h-4' : size === 'lg' ? 'w-8 h-8' : 'w-6 h-6';
-  return (
-    <div className={`animate-spin rounded-full border-2 border-green-200 border-t-green-600 ${sizeClass}`}></div>
-  );
-};
-
-const Rating = ({ rating, onRating, readonly = false, size = 'md' }) => {
-  const [hovered, setHovered] = useState(0);
-  const sizeClass = size === 'sm' ? 'w-4 h-4' : size === 'lg' ? 'w-8 h-8' : 'w-6 h-6';
-
-  return (
-    <div className="flex space-x-1">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <button
-          key={star}
-          type="button"
-          disabled={readonly}
-          onClick={() => !readonly && onRating && onRating(star)}
-          onMouseEnter={() => !readonly && setHovered(star)}
-          onMouseLeave={() => !readonly && setHovered(0)}
-          className={`${readonly ? 'cursor-default' : 'cursor-pointer hover:scale-110'} transition-transform duration-200`}
-        >
-          <Star
-            className={`${sizeClass} ${
-              star <= (hovered || rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
-            }`}
-          />
-        </button>
-      ))}
-    </div>
-  );
-};
-
-// Componente de login simplificado
-const AuthForm = ({ onLogin }) => {
-  const [isLogin, setIsLogin] = useState(true);
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    full_name: '',
-    role: 'client'
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    try {
-      const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-      const payload = isLogin 
-        ? { email: formData.email, password: formData.password }
-        : formData;
-
-      const response = await axios.post(endpoint, payload);
-      
-      localStorage.setItem('access_token', response.data.access_token);
-      localStorage.setItem('user_data', JSON.stringify(response.data.user));
-      
-      onLogin(response.data.user);
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Error en la autenticación');
-    } finally {
-      setLoading(false);
+// Interceptor para manejar errores de autenticación
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('user_data');
+      window.location.reload();
     }
-  };
+    return Promise.reject(error);
+  }
+);
 
-  const handleGoogleSuccess = async (credentialResponse) => {
-    try {
-      const payload = JSON.parse(atob(credentialResponse.credential.split('.')[1]));
-      
-      // Completar con Google OAuth (simplificado)
-      const response = await axios.post('/api/auth/google/complete', {
-        code: payload.sub,
-        role: 'client'
-      });
+// Animaciones
+const pageTransition = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -20 },
+  transition: { duration: 0.3 }
+};
 
-      localStorage.setItem('access_token', response.data.access_token);
-      localStorage.setItem('user_data', JSON.stringify(response.data.user));
-      
-      onLogin(response.data.user);
-    } catch (error) {
-      setError('Error procesando autenticación con Google');
+const staggerContainer = {
+  initial: { opacity: 0 },
+  animate: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
     }
+  }
+};
+
+const staggerItem = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 }
+};
+
+// Componentes modernos
+const ModernButton = ({ children, variant = 'primary', size = 'md', loading = false, icon: Icon, ...props }) => {
+  const baseClasses = "inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-95";
+  
+  const variants = {
+    primary: "bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg hover:shadow-xl",
+    secondary: "bg-white hover:bg-gray-50 text-gray-700 border-2 border-gray-200 hover:border-gray-300 shadow-md hover:shadow-lg",
+    outline: "bg-transparent hover:bg-green-50 text-green-600 border-2 border-green-600 hover:border-green-700",
+    ghost: "bg-transparent hover:bg-gray-100 text-gray-700",
+    danger: "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg hover:shadow-xl"
+  };
+  
+  const sizes = {
+    sm: "px-4 py-2 text-sm",
+    md: "px-6 py-3 text-base",
+    lg: "px-8 py-4 text-lg"
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50 flex items-center justify-center px-4">
-      <div className="max-w-md w-full">
-        <div className="text-center mb-8">
-          <div className="text-6xl mb-4">🌱</div>
-          <h1 className="text-4xl font-bold text-green-600 mb-2">PASTO!</h1>
-          <p className="text-gray-600 text-lg">Servicios de jardinería al instante</p>
-        </div>
-
-        <div className="bg-white rounded-3xl shadow-xl p-8 border border-green-100">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6 flex items-center">
-              <AlertCircle className="w-5 h-5 mr-2" />
-              {error}
-            </div>
-          )}
-
-          <div className="mb-6">
-            <GoogleLogin
-              onSuccess={handleGoogleSuccess}
-              onError={() => setError('Error en autenticación con Google')}
-              useOneTap={false}
-              theme="outline"
-              size="large"
-              width="100%"
-              text={isLogin ? "signin_with" : "signup_with"}
-              locale="es"
-            />
-          </div>
-
-          <div className="relative mb-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-white text-gray-500">o continúa con email</span>
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
-              <>
-                <div>
-                  <input
-                    type="text"
-                    required
-                    value={formData.full_name}
-                    onChange={(e) => setFormData({...formData, full_name: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    placeholder="Nombre completo"
-                  />
-                </div>
-                <div>
-                  <select
-                    value={formData.role}
-                    onChange={(e) => setFormData({...formData, role: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  >
-                    <option value="client">🏠 Soy Cliente</option>
-                    <option value="gardener">🌿 Soy Jardinero</option>
-                  </select>
-                </div>
-              </>
-            )}
-
-            <div>
-              <input
-                type="email"
-                required
-                value={formData.email}
-                onChange={(e) => setFormData({...formData, email: e.target.value})}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                placeholder="Email"
-              />
-            </div>
-
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                required
-                value={formData.password}
-                onChange={(e) => setFormData({...formData, password: e.target.value})}
-                className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                placeholder="Contraseña"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
-              >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-green-600 text-white py-3 px-6 rounded-xl hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-200 disabled:opacity-50 transition-all duration-200 font-medium text-lg flex items-center justify-center"
-            >
-              {loading ? <Loading size="sm" /> : (isLogin ? 'Iniciar sesión' : 'Registrarse')}
-            </button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-green-600 hover:text-green-700 font-medium transition-colors"
-            >
-              {isLogin ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia sesión'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <motion.button
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+      className={`${baseClasses} ${variants[variant]} ${sizes[size]}`}
+      disabled={loading}
+      {...props}
+    >
+      {loading && (
+        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+      )}
+      {Icon && !loading && (
+        <Icon className="w-4 h-4 mr-2" />
+      )}
+      {children}
+    </motion.button>
   );
 };
 
-// Componente principal optimizado
-const Dashboard = ({ user, onLogout }) => {
-  const [activeTab, setActiveTab] = useState(user.role === 'client' ? 'request' : 'available');
-  const [notifications, setNotifications] = useState([]);
-  const [toast, setToast] = useState(null);
-
-  const showToast = (message, type = 'success') => {
-    setToast({ message, type });
-  };
-
-  const closeToast = () => {
-    setToast(null);
-  };
-
-  // Fetch notifications
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        const response = await axios.get('/api/notifications');
-        setNotifications(response.data);
-      } catch (err) {
-        console.error('Error fetching notifications:', err);
-      }
-    };
-
-    fetchNotifications();
-    // Polling cada 30 segundos
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Navegación simplificada
-  const tabs = user.role === 'client' ? [
-    { id: 'request', label: 'Solicitar', icon: Plus },
-    { id: 'history', label: 'Historial', icon: Clock },
-    { id: 'profile', label: 'Perfil', icon: User },
-  ] : [
-    { id: 'available', label: 'Trabajos', icon: Briefcase },
-    { id: 'my-jobs', label: 'Mis Trabajos', icon: Tool },
-    { id: 'profile', label: 'Perfil', icon: User },
-  ];
-
+const ModernCard = ({ children, className = "", hover = true, ...props }) => {
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
-        <div className="px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="text-2xl">🌱</div>
-              <div>
-                <h1 className="text-xl font-bold text-green-600">PASTO!</h1>
-                <p className="text-sm text-gray-500">Hola, {user.full_name}</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <button className="p-2 rounded-lg hover:bg-gray-100 relative">
-                <Bell className="w-6 h-6 text-gray-600" />
-                {notifications.filter(n => !n.read).length > 0 && (
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
-                    <span className="text-xs text-white">
-                      {notifications.filter(n => !n.read).length}
-                    </span>
-                  </div>
-                )}
-              </button>
-              <button onClick={onLogout} className="p-2 rounded-lg hover:bg-gray-100">
-                <ArrowLeft className="w-6 h-6 text-gray-600" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+    <motion.div
+      whileHover={hover ? { y: -4, boxShadow: "0 20px 40px rgba(0,0,0,0.1)" } : {}}
+      className={`bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden ${className}`}
+      {...props}
+    >
+      {children}
+    </motion.div>
+  );
+};
 
-      {/* Contenido principal */}
-      <main className="pb-20">
-        {user.role === 'client' ? (
-          <ClientDashboard 
-            user={user} 
-            activeTab={activeTab} 
-            onTabChange={setActiveTab}
-            showToast={showToast}
-            notifications={notifications}
-          />
-        ) : (
-          <GardenerDashboard 
-            user={user} 
-            activeTab={activeTab} 
-            onTabChange={setActiveTab}
-            showToast={showToast}
-            notifications={notifications}
-          />
+const ModernInput = ({ label, error, icon: Icon, ...props }) => {
+  return (
+    <div className="mb-4">
+      {label && (
+        <label className="block text-sm font-semibold text-gray-700 mb-2">
+          {label}
+        </label>
+      )}
+      <div className="relative">
+        {Icon && (
+          <Icon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
         )}
-      </main>
-
-      {/* Navegación inferior */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200">
-        <div className="flex">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 py-3 px-2 flex flex-col items-center justify-center transition-colors ${
-                  isActive 
-                    ? 'text-green-600 bg-green-50' 
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <Icon className={`w-5 h-5 mb-1 ${isActive ? 'text-green-600' : 'text-gray-500'}`} />
-                <span className="text-xs font-medium">{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </nav>
-
-      {/* Toast */}
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={closeToast}
+        <input
+          className={`w-full ${Icon ? 'pl-12' : 'pl-4'} pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 ${error ? 'border-red-500' : ''}`}
+          {...props}
         />
+      </div>
+      {error && (
+        <p className="mt-1 text-sm text-red-600">{error}</p>
       )}
     </div>
   );
 };
 
-// Dashboard para clientes simplificado
-const ClientDashboard = ({ user, activeTab, onTabChange, showToast, notifications }) => {
-  const [serviceForm, setServiceForm] = useState({
-    service_type: 'grass_cutting',
-    address: '',
-    terrain_width: 10,
-    terrain_length: 10,
-    notes: ''
-  });
-  const [estimation, setEstimation] = useState(null);
-  const [myRequests, setMyRequests] = useState([]);
-  const [loading, setLoading] = useState(false);
+const ModernSelect = ({ label, error, options, ...props }) => {
+  return (
+    <div className="mb-4">
+      {label && (
+        <label className="block text-sm font-semibold text-gray-700 mb-2">
+          {label}
+        </label>
+      )}
+      <select
+        className={`w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 ${error ? 'border-red-500' : ''}`}
+        {...props}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      {error && (
+        <p className="mt-1 text-sm text-red-600">{error}</p>
+      )}
+    </div>
+  );
+};
 
-  const serviceTypes = {
-    grass_cutting: { label: 'Corte de césped', icon: Scissors, color: 'text-green-600' },
-    pruning: { label: 'Poda', icon: TreePine, color: 'text-blue-600' },
-    cleaning: { label: 'Limpieza', icon: Sparkles, color: 'text-purple-600' },
-    maintenance: { label: 'Mantenimiento', icon: Tool, color: 'text-orange-600' }
-  };
+const ModernTextarea = ({ label, error, ...props }) => {
+  return (
+    <div className="mb-4">
+      {label && (
+        <label className="block text-sm font-semibold text-gray-700 mb-2">
+          {label}
+        </label>
+      )}
+      <textarea
+        className={`w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 resize-none ${error ? 'border-red-500' : ''}`}
+        rows="4"
+        {...props}
+      />
+      {error && (
+        <p className="mt-1 text-sm text-red-600">{error}</p>
+      )}
+    </div>
+  );
+};
 
-  const statusColors = {
-    pending: 'bg-yellow-100 text-yellow-800',
-    accepted: 'bg-blue-100 text-blue-800',
-    on_way: 'bg-purple-100 text-purple-800',
-    in_progress: 'bg-green-100 text-green-800',
-    completed: 'bg-green-100 text-green-800',
-    cancelled: 'bg-red-100 text-red-800'
-  };
-
-  useEffect(() => {
-    if (activeTab === 'history') {
-      fetchMyRequests();
+const StatusBadge = ({ status, className = "" }) => {
+  const statusConfig = {
+    pending: { 
+      color: "bg-yellow-100 text-yellow-800 border-yellow-200", 
+      icon: Clock, 
+      text: "Pendiente" 
+    },
+    accepted: { 
+      color: "bg-blue-100 text-blue-800 border-blue-200", 
+      icon: CheckCircle, 
+      text: "Aceptado" 
+    },
+    on_way: { 
+      color: "bg-purple-100 text-purple-800 border-purple-200", 
+      icon: Car, 
+      text: "En camino" 
+    },
+    in_progress: { 
+      color: "bg-orange-100 text-orange-800 border-orange-200", 
+      icon: Wrench, 
+      text: "En progreso" 
+    },
+    completed: { 
+      color: "bg-green-100 text-green-800 border-green-200", 
+      icon: Check, 
+      text: "Completado" 
+    },
+    cancelled: { 
+      color: "bg-red-100 text-red-800 border-red-200", 
+      icon: XCircle, 
+      text: "Cancelado" 
     }
-  }, [activeTab]);
+  };
 
-  const fetchMyRequests = async () => {
+  const config = statusConfig[status] || statusConfig.pending;
+  const Icon = config.icon;
+
+  return (
+    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${config.color} ${className}`}>
+      <Icon className="w-4 h-4 mr-1" />
+      {config.text}
+    </span>
+  );
+};
+
+const Rating = ({ rating, readonly = false, size = 'md', onChange }) => {
+  const [hover, setHover] = useState(0);
+  const [currentRating, setCurrentRating] = useState(rating);
+
+  const sizes = {
+    sm: "w-4 h-4",
+    md: "w-5 h-5",
+    lg: "w-6 h-6"
+  };
+
+  const handleClick = (value) => {
+    if (!readonly) {
+      setCurrentRating(value);
+      onChange && onChange(value);
+    }
+  };
+
+  return (
+    <div className="flex items-center space-x-1">
+      {[1, 2, 3, 4, 5].map((value) => (
+        <motion.button
+          key={value}
+          type="button"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => handleClick(value)}
+          onMouseEnter={() => setHover(value)}
+          onMouseLeave={() => setHover(0)}
+          className={`${readonly ? 'cursor-default' : 'cursor-pointer'} transition-colors duration-200`}
+        >
+          <Star
+            className={`${sizes[size]} ${
+              value <= (hover || currentRating) 
+                ? 'fill-yellow-400 text-yellow-400' 
+                : 'text-gray-300'
+            }`}
+          />
+        </motion.button>
+      ))}
+    </div>
+  );
+};
+
+const Loading = ({ size = 'md' }) => {
+  const sizes = {
+    sm: "w-4 h-4",
+    md: "w-8 h-8",
+    lg: "w-12 h-12"
+  };
+
+  return (
+    <div className="flex items-center justify-center">
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+        className={`${sizes[size]} border-2 border-green-500 border-t-transparent rounded-full`}
+      />
+    </div>
+  );
+};
+
+const Toast = ({ message, type = 'info', visible, onClose }) => {
+  const typeConfig = {
+    success: { color: 'bg-green-500', icon: CheckCircle },
+    error: { color: 'bg-red-500', icon: XCircle },
+    warning: { color: 'bg-yellow-500', icon: AlertCircle },
+    info: { color: 'bg-blue-500', icon: Info }
+  };
+
+  const config = typeConfig[type];
+  const Icon = config.icon;
+
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          initial={{ opacity: 0, y: -50, x: '100%' }}
+          animate={{ opacity: 1, y: 0, x: 0 }}
+          exit={{ opacity: 0, y: -50, x: '100%' }}
+          className={`fixed top-4 right-4 z-50 ${config.color} text-white px-6 py-4 rounded-xl shadow-lg flex items-center space-x-3 max-w-sm`}
+        >
+          <Icon className="w-5 h-5 flex-shrink-0" />
+          <p className="flex-1">{message}</p>
+          <button
+            onClick={onClose}
+            className="ml-2 hover:bg-white/20 rounded-full p-1 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+
+// Hook para notificaciones
+const useToast = () => {
+  const [toasts, setToasts] = useState([]);
+
+  const showToast = (message, type = 'info') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 5000);
+  };
+
+  const hideToast = (id) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  };
+
+  return { showToast, toasts, hideToast };
+};
+
+// Componente de autenticación
+const AuthForm = ({ onLogin }) => {
+  const [isLogin, setIsLogin] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    full_name: '',
+    phone: '',
+    role: 'client'
+  });
+  const [errors, setErrors] = useState({});
+  const { showToast } = useToast();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrors({});
+
     try {
-      setLoading(true);
-      const response = await axios.get('/api/services/my-requests');
-      setMyRequests(response.data);
-    } catch (err) {
-      showToast('Error al cargar solicitudes', 'error');
+      const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+      const response = await axiosInstance.post(endpoint, formData);
+      
+      localStorage.setItem('access_token', response.data.access_token);
+      localStorage.setItem('user_data', JSON.stringify(response.data.user));
+      
+      showToast(isLogin ? '¡Bienvenido!' : '¡Registro exitoso!', 'success');
+      onLogin(response.data.user);
+    } catch (error) {
+      const errorMessage = error.response?.data?.detail || 'Error en la autenticación';
+      showToast(errorMessage, 'error');
+      setErrors({ general: errorMessage });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEstimateAndRequest = async () => {
-    if (!serviceForm.address.trim()) {
-      showToast('Por favor ingresa una dirección', 'error');
-      return;
-    }
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
 
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-md"
+      >
+        <ModernCard className="p-8">
+          <div className="text-center mb-8">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+              className="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-full mx-auto mb-4 flex items-center justify-center"
+            >
+              <Leaf className="w-8 h-8 text-white" />
+            </motion.div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">PASTO!</h1>
+            <p className="text-gray-600">
+              {isLogin ? 'Inicia sesión en tu cuenta' : 'Crea tu cuenta nueva'}
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {!isLogin && (
+              <ModernInput
+                label="Nombre completo"
+                name="full_name"
+                type="text"
+                value={formData.full_name}
+                onChange={handleChange}
+                placeholder="Tu nombre completo"
+                icon={User}
+                required
+              />
+            )}
+
+            <ModernInput
+              label="Email"
+              name="email"
+              type="email"
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="tu@email.com"
+              icon={Mail}
+              required
+            />
+
+            <ModernInput
+              label="Contraseña"
+              name="password"
+              type="password"
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="Tu contraseña"
+              icon={Shield}
+              required
+            />
+
+            {!isLogin && (
+              <>
+                <ModernInput
+                  label="Teléfono (opcional)"
+                  name="phone"
+                  type="tel"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  placeholder="+57 123 456 7890"
+                  icon={Phone}
+                />
+
+                <ModernSelect
+                  label="Tipo de cuenta"
+                  name="role"
+                  value={formData.role}
+                  onChange={handleChange}
+                  options={[
+                    { value: 'client', label: 'Cliente - Solicitar servicios' },
+                    { value: 'gardener', label: 'Jardinero - Ofrecer servicios' }
+                  ]}
+                />
+              </>
+            )}
+
+            {errors.general && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm"
+              >
+                {errors.general}
+              </motion.div>
+            )}
+
+            <ModernButton
+              type="submit"
+              loading={loading}
+              className="w-full"
+              size="lg"
+            >
+              {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
+            </ModernButton>
+          </form>
+
+          <div className="mt-6 text-center">
+            <p className="text-gray-600">
+              {isLogin ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?'}
+              <button
+                onClick={() => setIsLogin(!isLogin)}
+                className="ml-1 text-green-600 hover:text-green-700 font-semibold"
+              >
+                {isLogin ? 'Regístrate' : 'Inicia sesión'}
+              </button>
+            </p>
+          </div>
+        </ModernCard>
+      </motion.div>
+    </div>
+  );
+};
+
+// Componente principal del Dashboard
+const Dashboard = ({ user, onLogout }) => {
+  const [activeTab, setActiveTab] = useState('home');
+  const [loading, setLoading] = useState(false);
+  const [services, setServices] = useState([]);
+  const [myRequests, setMyRequests] = useState([]);
+  const [availableServices, setAvailableServices] = useState([]);
+  const [myJobs, setMyJobs] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const { showToast, toasts, hideToast } = useToast();
+
+  // Cargar datos iniciales
+  useEffect(() => {
+    loadInitialData();
+  }, []);
+
+  const loadInitialData = async () => {
     setLoading(true);
     try {
-      // Estimar precio
-      const params = new URLSearchParams({
-        service_type: serviceForm.service_type,
-        terrain_width: serviceForm.terrain_width,
-        terrain_length: serviceForm.terrain_length,
-      });
+      // Cargar notificaciones
+      const notifResponse = await axiosInstance.get('/api/notifications');
+      setNotifications(notifResponse.data);
 
-      const estimationResponse = await axios.post(`/api/services/estimate?${params}`);
-      setEstimation(estimationResponse.data);
-
-      // Crear solicitud directamente
-      const requestData = {
-        ...serviceForm,
-        client_id: user.user_id,
-        latitude: -34.6037,
-        longitude: -58.3816,
-        is_immediate: true,
-        images: []
-      };
-      
-      await axios.post('/api/services/request', requestData);
-      showToast('¡Solicitud enviada! Un jardinero la tomará pronto.', 'success');
-      
-      // Reset form
-      setServiceForm({
-        service_type: 'grass_cutting',
-        address: '',
-        terrain_width: 10,
-        terrain_length: 10,
-        notes: ''
-      });
-      setEstimation(null);
-      
-      onTabChange('history');
-    } catch (err) {
-      showToast('Error al enviar la solicitud', 'error');
+      // Cargar datos según el rol del usuario
+      if (user.role === 'client') {
+        const requestsResponse = await axiosInstance.get('/api/services/my-requests');
+        setMyRequests(requestsResponse.data);
+      } else if (user.role === 'gardener') {
+        const [availableResponse, jobsResponse] = await Promise.all([
+          axiosInstance.get('/api/services/available'),
+          axiosInstance.get('/api/services/my-jobs')
+        ]);
+        setAvailableServices(availableResponse.data);
+        setMyJobs(jobsResponse.data);
+      }
+    } catch (error) {
+      showToast('Error al cargar datos', 'error');
     } finally {
       setLoading(false);
     }
   };
 
+  // Tipos de servicios
+  const serviceTypes = {
+    grass_cutting: { label: 'Corte de césped', icon: Scissors, color: 'text-green-600' },
+    pruning: { label: 'Poda', icon: Leaf, color: 'text-blue-600' },
+    cleaning: { label: 'Limpieza', icon: Broom, color: 'text-purple-600' },
+    maintenance: { label: 'Mantenimiento', icon: Wrench, color: 'text-orange-600' }
+  };
+
+  // Navegación inferior
+  const navigation = [
+    { id: 'home', label: 'Inicio', icon: Home },
+    user.role === 'client' && { id: 'request', label: 'Solicitar', icon: Plus },
+    user.role === 'client' && { id: 'my-requests', label: 'Mis Solicitudes', icon: Briefcase },
+    user.role === 'gardener' && { id: 'available', label: 'Disponibles', icon: Search },
+    user.role === 'gardener' && { id: 'my-jobs', label: 'Mis Trabajos', icon: Briefcase },
+    { id: 'profile', label: 'Perfil', icon: User }
+  ].filter(Boolean);
+
+  const TabButton = ({ tab, isActive, onClick }) => {
+    const Icon = tab.icon;
+    return (
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={onClick}
+        className={`flex flex-col items-center justify-center py-3 px-2 rounded-xl transition-all duration-200 ${
+          isActive 
+            ? 'bg-green-600 text-white shadow-lg' 
+            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+        }`}
+      >
+        <Icon className="w-5 h-5 mb-1" />
+        <span className="text-xs font-medium">{tab.label}</span>
+      </motion.button>
+    );
+  };
+
+  // Componente de Solicitar Servicio
+  const RequestService = () => {
+    const [formData, setFormData] = useState({
+      service_type: 'grass_cutting',
+      address: '',
+      latitude: -4.6097,
+      longitude: -74.0817,
+      terrain_width: '',
+      terrain_length: '',
+      pruning_difficulty: 'medium',
+      notes: '',
+      is_immediate: true
+    });
+    const [estimation, setEstimation] = useState(null);
+    const [submitting, setSubmitting] = useState(false);
+
+    const handleEstimate = async () => {
+      if (!formData.terrain_width || !formData.terrain_length) {
+        showToast('Por favor ingresa las dimensiones del terreno', 'warning');
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const response = await axiosInstance.post('/api/services/estimate', {
+          service_type: formData.service_type,
+          terrain_width: parseFloat(formData.terrain_width),
+          terrain_length: parseFloat(formData.terrain_length),
+          pruning_difficulty: formData.pruning_difficulty
+        });
+        setEstimation(response.data);
+      } catch (error) {
+        showToast('Error al calcular estimación', 'error');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const handleSubmit = async (e) => {
+      e.preventDefault();
+      setSubmitting(true);
+
+      try {
+        const response = await axiosInstance.post('/api/services/request', {
+          ...formData,
+          terrain_width: parseFloat(formData.terrain_width),
+          terrain_length: parseFloat(formData.terrain_length)
+        });
+        
+        showToast('¡Solicitud enviada exitosamente!', 'success');
+        setFormData({
+          service_type: 'grass_cutting',
+          address: '',
+          latitude: -4.6097,
+          longitude: -74.0817,
+          terrain_width: '',
+          terrain_length: '',
+          pruning_difficulty: 'medium',
+          notes: '',
+          is_immediate: true
+        });
+        setEstimation(null);
+        loadInitialData();
+      } catch (error) {
+        showToast('Error al enviar solicitud', 'error');
+      } finally {
+        setSubmitting(false);
+      }
+    };
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="p-4 space-y-6"
+      >
+        <ModernCard className="p-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">Solicitar Servicio</h2>
+          
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <ModernSelect
+              label="Tipo de servicio"
+              name="service_type"
+              value={formData.service_type}
+              onChange={(e) => setFormData({...formData, service_type: e.target.value})}
+              options={Object.entries(serviceTypes).map(([key, value]) => ({
+                value: key,
+                label: value.label
+              }))}
+            />
+
+            <ModernInput
+              label="Dirección"
+              name="address"
+              value={formData.address}
+              onChange={(e) => setFormData({...formData, address: e.target.value})}
+              placeholder="Calle 123 #45-67, Bogotá"
+              icon={MapPin}
+              required
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <ModernInput
+                label="Ancho (metros)"
+                name="terrain_width"
+                type="number"
+                value={formData.terrain_width}
+                onChange={(e) => setFormData({...formData, terrain_width: e.target.value})}
+                placeholder="10"
+                step="0.1"
+                min="0.1"
+                required
+              />
+              <ModernInput
+                label="Largo (metros)"
+                name="terrain_length"
+                type="number"
+                value={formData.terrain_length}
+                onChange={(e) => setFormData({...formData, terrain_length: e.target.value})}
+                placeholder="15"
+                step="0.1"
+                min="0.1"
+                required
+              />
+            </div>
+
+            {formData.service_type === 'pruning' && (
+              <ModernSelect
+                label="Dificultad de poda"
+                name="pruning_difficulty"
+                value={formData.pruning_difficulty}
+                onChange={(e) => setFormData({...formData, pruning_difficulty: e.target.value})}
+                options={[
+                  { value: 'easy', label: 'Fácil' },
+                  { value: 'medium', label: 'Medio' },
+                  { value: 'hard', label: 'Difícil' }
+                ]}
+              />
+            )}
+
+            <ModernTextarea
+              label="Notas adicionales (opcional)"
+              name="notes"
+              value={formData.notes}
+              onChange={(e) => setFormData({...formData, notes: e.target.value})}
+              placeholder="Cualquier información adicional sobre el trabajo..."
+            />
+
+            <div className="flex space-x-4">
+              <ModernButton
+                type="button"
+                variant="outline"
+                onClick={handleEstimate}
+                loading={loading}
+                icon={Calculator}
+                className="flex-1"
+              >
+                Calcular Precio
+              </ModernButton>
+              <ModernButton
+                type="submit"
+                loading={submitting}
+                icon={Send}
+                className="flex-1"
+              >
+                Enviar Solicitud
+              </ModernButton>
+            </div>
+          </form>
+
+          {estimation && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="mt-6 p-4 bg-green-50 border border-green-200 rounded-xl"
+            >
+              <h3 className="font-semibold text-green-800 mb-2">Estimación de Precio</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-600">Área:</span>
+                  <span className="ml-2 font-medium">{estimation.terrain_area} m²</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Duración:</span>
+                  <span className="ml-2 font-medium">{estimation.estimated_duration} min</span>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-gray-600">Precio estimado:</span>
+                  <span className="ml-2 text-lg font-bold text-green-600">
+                    ${estimation.estimated_price} {estimation.currency}
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </ModernCard>
+      </motion.div>
+    );
+  };
+
+  // Renderizar contenido según la pestaña activa
   const renderContent = () => {
     switch (activeTab) {
-      case 'request':
+      case 'home':
         return (
-          <div className="p-4 space-y-6">
-            <div className="bg-white rounded-2xl shadow-sm p-6">
-              <h2 className="text-xl font-semibold mb-4 flex items-center">
-                <Plus className="w-6 h-6 mr-2 text-green-600" />
-                Solicitar servicio
-              </h2>
-              
-              <div className="space-y-4">
-                {/* Tipo de servicio */}
-                <div className="grid grid-cols-2 gap-3">
-                  {Object.entries(serviceTypes).map(([key, service]) => {
-                    const Icon = service.icon;
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setServiceForm({...serviceForm, service_type: key})}
-                        className={`p-4 rounded-xl border-2 transition-all duration-200 flex flex-col items-center space-y-2 ${
-                          serviceForm.service_type === key
-                            ? 'border-green-500 bg-green-50'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        <Icon className={`w-6 h-6 ${serviceForm.service_type === key ? 'text-green-600' : 'text-gray-400'}`} />
-                        <span className={`text-sm font-medium ${serviceForm.service_type === key ? 'text-green-600' : 'text-gray-600'}`}>
-                          {service.label}
-                        </span>
-                      </button>
-                    );
-                  })}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="p-4 space-y-6"
+          >
+            {/* Header de bienvenida */}
+            <ModernCard className="bg-gradient-to-r from-green-500 to-green-600 text-white p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-2xl font-bold">¡Hola, {user.full_name}! 👋</h1>
+                  <p className="text-green-100 mt-1">
+                    {user.role === 'client' ? 'Solicita servicios de jardinería' : 'Encuentra trabajos disponibles'}
+                  </p>
                 </div>
-
-                {/* Dirección */}
-                <input
-                  type="text"
-                  value={serviceForm.address}
-                  onChange={(e) => setServiceForm({...serviceForm, address: e.target.value})}
-                  placeholder="📍 Dirección del servicio"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-
-                {/* Medidas */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm text-gray-600 mb-1 block">Ancho (metros)</label>
-                    <input
-                      type="number"
-                      value={serviceForm.terrain_width}
-                      onChange={(e) => setServiceForm({...serviceForm, terrain_width: parseFloat(e.target.value) || 0})}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
-                      min="1"
-                      step="0.1"
-                    />
+                <div className="flex items-center space-x-2">
+                  <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                    <User className="w-6 h-6" />
                   </div>
-                  <div>
-                    <label className="text-sm text-gray-600 mb-1 block">Largo (metros)</label>
-                    <input
-                      type="number"
-                      value={serviceForm.terrain_length}
-                      onChange={(e) => setServiceForm({...serviceForm, terrain_length: parseFloat(e.target.value) || 0})}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
-                      min="1"
-                      step="0.1"
-                    />
-                  </div>
-                </div>
-                <div className="text-sm text-gray-500 text-center">
-                  Área total: {(serviceForm.terrain_width * serviceForm.terrain_length).toFixed(1)} m²
-                </div>
-
-                {/* Notas */}
-                <textarea
-                  value={serviceForm.notes}
-                  onChange={(e) => setServiceForm({...serviceForm, notes: e.target.value})}
-                  rows={3}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
-                  placeholder="💬 Notas adicionales (opcional)"
-                />
-
-                {/* Estimación */}
-                {estimation && (
-                  <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <div className="text-2xl font-bold text-green-600">
-                          ${estimation.estimated_price}
-                        </div>
-                        <div className="text-sm text-gray-600">Precio estimado</div>
-                      </div>
-                      <div>
-                        <div className="text-2xl font-bold text-blue-600">
-                          {estimation.estimated_duration} min
-                        </div>
-                        <div className="text-sm text-gray-600">Duración estimada</div>
-                      </div>
+                  <div className="text-right">
+                    <div className="flex items-center">
+                      <Star className="w-4 h-4 fill-yellow-400 text-yellow-400 mr-1" />
+                      <span className="font-semibold">{user.rating}</span>
                     </div>
+                    <span className="text-xs text-green-100">({user.total_ratings} calificaciones)</span>
                   </div>
-                )}
-
-                <button
-                  onClick={handleEstimateAndRequest}
-                  disabled={loading || !serviceForm.address}
-                  className="w-full bg-green-600 text-white py-4 px-6 rounded-xl hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center font-medium text-lg"
-                >
-                  {loading ? <Loading size="sm" /> : (
-                    <>
-                      <Send className="w-5 h-5 mr-2" />
-                      Solicitar servicio
-                    </>
-                  )}
-                </button>
+                </div>
               </div>
+            </ModernCard>
+
+            {/* Estadísticas rápidas */}
+            <div className="grid grid-cols-2 gap-4">
+              <ModernCard className="p-4 text-center">
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <Briefcase className="w-6 h-6 text-blue-600" />
+                </div>
+                <div className="text-2xl font-bold text-gray-900">
+                  {user.role === 'client' ? myRequests.length : myJobs.length}
+                </div>
+                <div className="text-sm text-gray-600">
+                  {user.role === 'client' ? 'Mis Solicitudes' : 'Mis Trabajos'}
+                </div>
+              </ModernCard>
+
+              <ModernCard className="p-4 text-center">
+                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <CheckCircle className="w-6 h-6 text-green-600" />
+                </div>
+                <div className="text-2xl font-bold text-gray-900">
+                  {user.role === 'client' 
+                    ? myRequests.filter(r => r.status === 'completed').length
+                    : myJobs.filter(j => j.status === 'completed').length
+                  }
+                </div>
+                <div className="text-sm text-gray-600">Completados</div>
+              </ModernCard>
             </div>
-          </div>
+
+            {/* Notificaciones recientes */}
+            {notifications.length > 0 && (
+              <ModernCard className="p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Notificaciones Recientes
+                </h3>
+                <div className="space-y-3">
+                  {notifications.slice(0, 3).map((notification) => (
+                    <motion.div
+                      key={notification.notification_id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg"
+                    >
+                      <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900">{notification.title}</h4>
+                        <p className="text-sm text-gray-600">{notification.message}</p>
+                        <span className="text-xs text-gray-500">
+                          {new Date(notification.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </ModernCard>
+            )}
+
+            {/* Acciones rápidas */}
+            <div className="grid grid-cols-1 gap-4">
+              {user.role === 'client' && (
+                <ModernButton
+                  onClick={() => setActiveTab('request')}
+                  icon={Plus}
+                  size="lg"
+                  className="w-full"
+                >
+                  Solicitar Servicio
+                </ModernButton>
+              )}
+              {user.role === 'gardener' && (
+                <ModernButton
+                  onClick={() => setActiveTab('available')}
+                  icon={Search}
+                  size="lg"
+                  className="w-full"
+                >
+                  Ver Servicios Disponibles
+                </ModernButton>
+              )}
+            </div>
+          </motion.div>
         );
 
-      case 'history':
-        return (
-          <div className="p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Mis solicitudes</h2>
-              <button
-                onClick={fetchMyRequests}
-                disabled={loading}
-                className="p-2 rounded-lg bg-white border border-gray-200 hover:bg-gray-50"
-              >
-                <RefreshCw className={`w-5 h-5 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
-            
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <Loading size="lg" />
-              </div>
-            ) : myRequests.length === 0 ? (
-              <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
-                <div className="text-6xl mb-4">🌱</div>
-                <p className="text-gray-500 mb-4">No tienes solicitudes aún</p>
-                <button
-                  onClick={() => onTabChange('request')}
-                  className="bg-green-600 text-white py-2 px-4 rounded-xl hover:bg-green-700"
+      case 'request':
+        return user.role === 'client' ? <RequestService /> : null;
+
+      case 'my-requests':
+        return user.role === 'client' ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="p-4"
+          >
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Mis Solicitudes</h2>
+            {myRequests.length === 0 ? (
+              <ModernCard className="p-8 text-center">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Briefcase className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No tienes solicitudes</h3>
+                <p className="text-gray-600 mb-6">¡Solicita tu primer servicio ahora!</p>
+                <ModernButton
+                  onClick={() => setActiveTab('request')}
+                  icon={Plus}
                 >
-                  Solicitar primer servicio
-                </button>
-              </div>
+                  Solicitar Servicio
+                </ModernButton>
+              </ModernCard>
             ) : (
-              <div className="space-y-4">
+              <motion.div
+                variants={staggerContainer}
+                initial="initial"
+                animate="animate"
+                className="space-y-4"
+              >
                 {myRequests.map((request) => {
                   const serviceType = serviceTypes[request.service_type];
                   const ServiceIcon = serviceType.icon;
                   
                   return (
-                    <div key={request.service_id} className="bg-white rounded-2xl shadow-sm p-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center space-x-3">
-                          <div className="p-3 bg-gray-50 rounded-xl">
-                            <ServiceIcon className={`w-6 h-6 ${serviceType.color}`} />
+                    <motion.div
+                      key={request.service_id}
+                      variants={staggerItem}
+                    >
+                      <ModernCard className="p-6">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center space-x-3">
+                            <div className="p-3 bg-gray-50 rounded-xl">
+                              <ServiceIcon className={`w-6 h-6 ${serviceType.color}`} />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-gray-900">{serviceType.label}</h3>
+                              <p className="text-sm text-gray-500">{request.address}</p>
+                              {request.gardener_name && (
+                                <p className="text-sm text-gray-500">Jardinero: {request.gardener_name}</p>
+                              )}
+                            </div>
+                          </div>
+                          <StatusBadge status={request.status} />
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+                          <div>
+                            <span className="text-gray-500">Precio:</span>
+                            <span className="ml-2 font-medium text-green-600">${request.estimated_price}</span>
                           </div>
                           <div>
-                            <h3 className="font-semibold text-gray-900">{serviceType.label}</h3>
-                            <p className="text-sm text-gray-500">{request.address}</p>
+                            <span className="text-gray-500">Área:</span>
+                            <span className="ml-2 font-medium">{request.terrain_width}x{request.terrain_length}m</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">Creado:</span>
+                            <span className="ml-2 font-medium">{new Date(request.created_at).toLocaleDateString()}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">Duración:</span>
+                            <span className="ml-2 font-medium">{request.estimated_duration} min</span>
                           </div>
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[request.status]}`}>
-                          {request.status}
-                        </span>
-                      </div>
-                      
-                      <div className="grid grid-cols-3 gap-4 text-sm">
-                        <div>
-                          <span className="text-gray-500">Precio:</span>
-                          <span className="ml-2 font-medium text-green-600">${request.estimated_price}</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Área:</span>
-                          <span className="ml-2 font-medium">{request.terrain_width}x{request.terrain_length}m</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Fecha:</span>
-                          <span className="ml-2 font-medium">{new Date(request.created_at).toLocaleDateString()}</span>
-                        </div>
-                      </div>
 
-                      {request.gardener_name && (
-                        <div className="mt-4 bg-blue-50 rounded-xl p-3">
-                          <p className="text-sm text-blue-800">
-                            🧑‍🌾 Jardinero: <span className="font-medium">{request.gardener_name}</span>
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                        {request.notes && (
+                          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                            <p className="text-sm text-gray-700">{request.notes}</p>
+                          </div>
+                        )}
+
+                        {request.status === 'completed' && !request.client_rating && (
+                          <div className="border-t pt-4">
+                            <h4 className="font-medium text-gray-900 mb-2">Califica este servicio</h4>
+                            <Rating
+                              rating={0}
+                              onChange={(rating) => {
+                                // Aquí iría la lógica para calificar
+                                console.log('Rating:', rating);
+                              }}
+                            />
+                          </div>
+                        )}
+                      </ModernCard>
+                    </motion.div>
                   );
                 })}
-              </div>
+              </motion.div>
             )}
-          </div>
-        );
+          </motion.div>
+        ) : null;
 
-      case 'profile':
-        return (
-          <div className="p-4">
-            <div className="bg-white rounded-2xl shadow-sm p-6">
-              <div className="text-center mb-6">
-                <div className="w-20 h-20 bg-green-100 rounded-full mx-auto mb-4 flex items-center justify-center">
-                  <User className="w-10 h-10 text-green-600" />
-                </div>
-                <h2 className="text-xl font-semibold text-gray-900">{user.full_name}</h2>
-                <p className="text-gray-500">{user.email}</p>
-                <div className="flex items-center justify-center mt-2">
-                  <Rating rating={user.rating} readonly size="sm" />
-                  <span className="text-sm text-gray-500 ml-2">({user.total_ratings} calificaciones)</span>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between py-3 border-b">
-                  <span className="text-gray-600">📧 Email</span>
-                  <span className="text-gray-900">{user.email}</span>
-                </div>
-                {user.phone && (
-                  <div className="flex items-center justify-between py-3 border-b">
-                    <span className="text-gray-600">📱 Teléfono</span>
-                    <span className="text-gray-900">{user.phone}</span>
-                  </div>
-                )}
-                <div className="flex items-center justify-between py-3">
-                  <span className="text-gray-600">📅 Miembro desde</span>
-                  <span className="text-gray-900">{new Date(user.created_at).toLocaleDateString()}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  return renderContent();
-};
-
-// Dashboard para jardineros simplificado
-const GardenerDashboard = ({ user, activeTab, onTabChange, showToast, notifications }) => {
-  const [availableServices, setAvailableServices] = useState([]);
-  const [myJobs, setMyJobs] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  const serviceTypes = {
-    grass_cutting: { label: 'Corte de césped', icon: Scissors, color: 'text-green-600' },
-    pruning: { label: 'Poda', icon: TreePine, color: 'text-blue-600' },
-    cleaning: { label: 'Limpieza', icon: Sparkles, color: 'text-purple-600' },
-    maintenance: { label: 'Mantenimiento', icon: Tool, color: 'text-orange-600' }
-  };
-
-  const statusColors = {
-    pending: 'bg-yellow-100 text-yellow-800',
-    accepted: 'bg-blue-100 text-blue-800',
-    on_way: 'bg-purple-100 text-purple-800',
-    in_progress: 'bg-green-100 text-green-800',
-    completed: 'bg-green-100 text-green-800',
-    cancelled: 'bg-red-100 text-red-800'
-  };
-
-  useEffect(() => {
-    if (activeTab === 'available') {
-      fetchAvailableServices();
-    } else if (activeTab === 'my-jobs') {
-      fetchMyJobs();
-    }
-  }, [activeTab]);
-
-  const fetchAvailableServices = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.get('/api/services/available');
-      setAvailableServices(response.data);
-    } catch (err) {
-      showToast('Error al cargar trabajos', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchMyJobs = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.get('/api/services/my-jobs');
-      setMyJobs(response.data);
-    } catch (err) {
-      showToast('Error al cargar trabajos', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAcceptService = async (serviceId) => {
-    try {
-      await axios.post(`/api/services/${serviceId}/accept`);
-      showToast('¡Servicio aceptado!', 'success');
-      fetchAvailableServices();
-      onTabChange('my-jobs');
-    } catch (err) {
-      showToast('Error al aceptar servicio', 'error');
-    }
-  };
-
-  const handleUpdateStatus = async (serviceId, status) => {
-    try {
-      await axios.post(`/api/services/${serviceId}/update-status`, { status });
-      showToast('Estado actualizado', 'success');
-      fetchMyJobs();
-    } catch (err) {
-      showToast('Error al actualizar estado', 'error');
-    }
-  };
-
-  const renderContent = () => {
-    switch (activeTab) {
       case 'available':
-        return (
-          <div className="p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Trabajos disponibles</h2>
-              <button
-                onClick={fetchAvailableServices}
-                disabled={loading}
-                className="p-2 rounded-lg bg-white border border-gray-200 hover:bg-gray-50"
-              >
-                <RefreshCw className={`w-5 h-5 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
-            
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <Loading size="lg" />
-              </div>
-            ) : availableServices.length === 0 ? (
-              <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
-                <div className="text-6xl mb-4">🌿</div>
-                <p className="text-gray-500">No hay trabajos disponibles</p>
-              </div>
+        return user.role === 'gardener' ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="p-4"
+          >
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Servicios Disponibles</h2>
+            {availableServices.length === 0 ? (
+              <ModernCard className="p-8 text-center">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Search className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No hay servicios disponibles</h3>
+                <p className="text-gray-600">Revisa más tarde para encontrar nuevos trabajos</p>
+              </ModernCard>
             ) : (
-              <div className="space-y-4">
+              <motion.div
+                variants={staggerContainer}
+                initial="initial"
+                animate="animate"
+                className="space-y-4"
+              >
                 {availableServices.map((service) => {
                   const serviceType = serviceTypes[service.service_type];
                   const ServiceIcon = serviceType.icon;
                   
                   return (
-                    <div key={service.service_id} className="bg-white rounded-2xl shadow-sm p-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center space-x-3">
-                          <div className="p-3 bg-gray-50 rounded-xl">
-                            <ServiceIcon className={`w-6 h-6 ${serviceType.color}`} />
+                    <motion.div
+                      key={service.service_id}
+                      variants={staggerItem}
+                    >
+                      <ModernCard className="p-6">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center space-x-3">
+                            <div className="p-3 bg-gray-50 rounded-xl">
+                              <ServiceIcon className={`w-6 h-6 ${serviceType.color}`} />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-gray-900">{serviceType.label}</h3>
+                              <p className="text-sm text-gray-500">{service.address}</p>
+                              <p className="text-sm text-gray-500">Cliente: {service.client_name}</p>
+                            </div>
+                          </div>
+                          <StatusBadge status={service.status} />
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+                          <div>
+                            <span className="text-gray-500">Precio:</span>
+                            <span className="ml-2 font-medium text-green-600">${service.estimated_price}</span>
                           </div>
                           <div>
-                            <h3 className="font-semibold text-gray-900">{serviceType.label}</h3>
-                            <p className="text-sm text-gray-500">{service.address}</p>
-                            <p className="text-sm text-gray-500">Cliente: {service.client_name}</p>
+                            <span className="text-gray-500">Área:</span>
+                            <span className="ml-2 font-medium">{service.terrain_width}x{service.terrain_length}m</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">Duración:</span>
+                            <span className="ml-2 font-medium">{service.estimated_duration} min</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">Creado:</span>
+                            <span className="ml-2 font-medium">{new Date(service.created_at).toLocaleDateString()}</span>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-green-600">
-                            ${service.estimated_price}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {service.estimated_duration} min
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-                        <div>
-                          <span className="text-gray-500">Área:</span>
-                          <span className="ml-2 font-medium">{service.terrain_width}x{service.terrain_length}m</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Fecha:</span>
-                          <span className="ml-2 font-medium">{new Date(service.created_at).toLocaleDateString()}</span>
-                        </div>
-                      </div>
 
-                      {service.notes && (
-                        <div className="mb-4">
-                          <p className="text-sm text-gray-600 p-3 bg-gray-50 rounded-lg">
-                            💬 {service.notes}
-                          </p>
-                        </div>
-                      )}
+                        {service.notes && (
+                          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                            <p className="text-sm text-gray-700">{service.notes}</p>
+                          </div>
+                        )}
 
-                      <button
-                        onClick={() => handleAcceptService(service.service_id)}
-                        className="w-full bg-green-600 text-white py-3 px-4 rounded-xl hover:bg-green-700 transition-colors font-medium"
-                      >
-                        <CheckCircle className="w-5 h-5 mr-2 inline" />
-                        Aceptar trabajo
-                      </button>
-                    </div>
+                        <ModernButton
+                          onClick={async () => {
+                            try {
+                              await axiosInstance.post(`/api/services/${service.service_id}/accept`);
+                              showToast('¡Servicio aceptado!', 'success');
+                              loadInitialData();
+                            } catch (error) {
+                              showToast('Error al aceptar servicio', 'error');
+                            }
+                          }}
+                          className="w-full"
+                          icon={Check}
+                        >
+                          Aceptar Trabajo
+                        </ModernButton>
+                      </ModernCard>
+                    </motion.div>
                   );
                 })}
-              </div>
+              </motion.div>
             )}
-          </div>
-        );
+          </motion.div>
+        ) : null;
 
       case 'my-jobs':
-        return (
-          <div className="p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Mis trabajos</h2>
-              <button
-                onClick={fetchMyJobs}
-                disabled={loading}
-                className="p-2 rounded-lg bg-white border border-gray-200 hover:bg-gray-50"
-              >
-                <RefreshCw className={`w-5 h-5 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
-            
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <Loading size="lg" />
-              </div>
-            ) : myJobs.length === 0 ? (
-              <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
-                <div className="text-6xl mb-4">🛠️</div>
-                <p className="text-gray-500 mb-4">No tienes trabajos aceptados</p>
-                <button
-                  onClick={() => onTabChange('available')}
-                  className="bg-green-600 text-white py-2 px-4 rounded-xl hover:bg-green-700"
+        return user.role === 'gardener' ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="p-4"
+          >
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Mis Trabajos</h2>
+            {myJobs.length === 0 ? (
+              <ModernCard className="p-8 text-center">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Briefcase className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No tienes trabajos</h3>
+                <p className="text-gray-600 mb-6">Acepta trabajos disponibles para empezar</p>
+                <ModernButton
+                  onClick={() => setActiveTab('available')}
+                  icon={Search}
                 >
-                  Ver trabajos disponibles
-                </button>
-              </div>
+                  Ver Trabajos Disponibles
+                </ModernButton>
+              </ModernCard>
             ) : (
-              <div className="space-y-4">
+              <motion.div
+                variants={staggerContainer}
+                initial="initial"
+                animate="animate"
+                className="space-y-4"
+              >
                 {myJobs.map((job) => {
                   const serviceType = serviceTypes[job.service_type];
                   const ServiceIcon = serviceType.icon;
                   
+                  const updateStatus = async (newStatus) => {
+                    try {
+                      await axiosInstance.post(`/api/services/${job.service_id}/update-status`, {
+                        status: newStatus
+                      });
+                      showToast('Estado actualizado', 'success');
+                      loadInitialData();
+                    } catch (error) {
+                      showToast('Error al actualizar estado', 'error');
+                    }
+                  };
+                  
                   return (
-                    <div key={job.service_id} className="bg-white rounded-2xl shadow-sm p-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center space-x-3">
-                          <div className="p-3 bg-gray-50 rounded-xl">
-                            <ServiceIcon className={`w-6 h-6 ${serviceType.color}`} />
+                    <motion.div
+                      key={job.service_id}
+                      variants={staggerItem}
+                    >
+                      <ModernCard className="p-6">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center space-x-3">
+                            <div className="p-3 bg-gray-50 rounded-xl">
+                              <ServiceIcon className={`w-6 h-6 ${serviceType.color}`} />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-gray-900">{serviceType.label}</h3>
+                              <p className="text-sm text-gray-500">{job.address}</p>
+                              <p className="text-sm text-gray-500">Cliente: {job.client_name}</p>
+                            </div>
+                          </div>
+                          <StatusBadge status={job.status} />
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+                          <div>
+                            <span className="text-gray-500">Precio:</span>
+                            <span className="ml-2 font-medium text-green-600">${job.estimated_price}</span>
                           </div>
                           <div>
-                            <h3 className="font-semibold text-gray-900">{serviceType.label}</h3>
-                            <p className="text-sm text-gray-500">{job.address}</p>
-                            <p className="text-sm text-gray-500">Cliente: {job.client_name}</p>
+                            <span className="text-gray-500">Área:</span>
+                            <span className="ml-2 font-medium">{job.terrain_width}x{job.terrain_length}m</span>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[job.status]}`}>
-                            {job.status}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-                        <div>
-                          <span className="text-gray-500">Precio:</span>
-                          <span className="ml-2 font-medium text-green-600">${job.estimated_price}</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Área:</span>
-                          <span className="ml-2 font-medium">{job.terrain_width}x{job.terrain_length}m</span>
-                        </div>
-                      </div>
 
-                      {/* Botones de acción según el estado */}
-                      {job.status === 'accepted' && (
+                        {/* Botones de acción según el estado */}
                         <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleUpdateStatus(job.service_id, 'on_way')}
-                            className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-xl hover:bg-blue-700 text-sm"
-                          >
-                            🚗 En camino
-                          </button>
-                          <button
-                            onClick={() => handleUpdateStatus(job.service_id, 'in_progress')}
-                            className="flex-1 bg-green-600 text-white py-2 px-4 rounded-xl hover:bg-green-700 text-sm"
-                          >
-                            🛠️ Comenzar
-                          </button>
+                          {job.status === 'accepted' && (
+                            <>
+                              <ModernButton
+                                onClick={() => updateStatus('on_way')}
+                                variant="outline"
+                                className="flex-1"
+                                icon={Car}
+                              >
+                                En camino
+                              </ModernButton>
+                              <ModernButton
+                                onClick={() => updateStatus('in_progress')}
+                                className="flex-1"
+                                icon={PlayCircle}
+                              >
+                                Comenzar
+                              </ModernButton>
+                            </>
+                          )}
+
+                          {job.status === 'on_way' && (
+                            <ModernButton
+                              onClick={() => updateStatus('in_progress')}
+                              className="w-full"
+                              icon={PlayCircle}
+                            >
+                              Comenzar trabajo
+                            </ModernButton>
+                          )}
+
+                          {job.status === 'in_progress' && (
+                            <ModernButton
+                              onClick={() => updateStatus('completed')}
+                              className="w-full"
+                              icon={CheckCircle}
+                            >
+                              Completar trabajo
+                            </ModernButton>
+                          )}
                         </div>
-                      )}
-
-                      {job.status === 'on_way' && (
-                        <button
-                          onClick={() => handleUpdateStatus(job.service_id, 'in_progress')}
-                          className="w-full bg-green-600 text-white py-2 px-4 rounded-xl hover:bg-green-700 text-sm"
-                        >
-                          🛠️ Comenzar trabajo
-                        </button>
-                      )}
-
-                      {job.status === 'in_progress' && (
-                        <button
-                          onClick={() => handleUpdateStatus(job.service_id, 'completed')}
-                          className="w-full bg-green-600 text-white py-2 px-4 rounded-xl hover:bg-green-700 text-sm"
-                        >
-                          ✅ Completar trabajo
-                        </button>
-                      )}
-                    </div>
+                      </ModernCard>
+                    </motion.div>
                   );
                 })}
-              </div>
+              </motion.div>
             )}
-          </div>
-        );
+          </motion.div>
+        ) : null;
 
       case 'profile':
         return (
-          <div className="p-4">
-            <div className="bg-white rounded-2xl shadow-sm p-6">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="p-4"
+          >
+            <ModernCard className="p-6">
               <div className="text-center mb-6">
-                <div className="w-20 h-20 bg-green-100 rounded-full mx-auto mb-4 flex items-center justify-center">
-                  <User className="w-10 h-10 text-green-600" />
+                <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-green-600 rounded-full mx-auto mb-4 flex items-center justify-center">
+                  <User className="w-10 h-10 text-white" />
                 </div>
                 <h2 className="text-xl font-semibold text-gray-900">{user.full_name}</h2>
                 <p className="text-gray-500">{user.email}</p>
@@ -1026,22 +1265,49 @@ const GardenerDashboard = ({ user, activeTab, onTabChange, showToast, notificati
 
               <div className="space-y-4">
                 <div className="flex items-center justify-between py-3 border-b">
-                  <span className="text-gray-600">📧 Email</span>
+                  <span className="text-gray-600 flex items-center">
+                    <Mail className="w-4 h-4 mr-2" />
+                    Email
+                  </span>
                   <span className="text-gray-900">{user.email}</span>
                 </div>
                 {user.phone && (
                   <div className="flex items-center justify-between py-3 border-b">
-                    <span className="text-gray-600">📱 Teléfono</span>
+                    <span className="text-gray-600 flex items-center">
+                      <Phone className="w-4 h-4 mr-2" />
+                      Teléfono
+                    </span>
                     <span className="text-gray-900">{user.phone}</span>
                   </div>
                 )}
-                <div className="flex items-center justify-between py-3">
-                  <span className="text-gray-600">📅 Miembro desde</span>
+                <div className="flex items-center justify-between py-3 border-b">
+                  <span className="text-gray-600 flex items-center">
+                    <Calendar className="w-4 h-4 mr-2" />
+                    Miembro desde
+                  </span>
                   <span className="text-gray-900">{new Date(user.created_at).toLocaleDateString()}</span>
                 </div>
+                <div className="flex items-center justify-between py-3">
+                  <span className="text-gray-600 flex items-center">
+                    <Shield className="w-4 h-4 mr-2" />
+                    Tipo de cuenta
+                  </span>
+                  <span className="text-gray-900 capitalize">{user.role}</span>
+                </div>
               </div>
-            </div>
-          </div>
+
+              <div className="mt-6 pt-6 border-t">
+                <ModernButton
+                  onClick={onLogout}
+                  variant="danger"
+                  className="w-full"
+                  icon={LogOut}
+                >
+                  Cerrar Sesión
+                </ModernButton>
+              </div>
+            </ModernCard>
+          </motion.div>
         );
 
       default:
@@ -1049,7 +1315,70 @@ const GardenerDashboard = ({ user, activeTab, onTabChange, showToast, notificati
     }
   };
 
-  return renderContent();
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
+        <div className="px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center">
+              <Leaf className="w-5 h-5 text-white" />
+            </div>
+            <h1 className="text-xl font-bold text-gray-900">PASTO!</h1>
+          </div>
+          <div className="flex items-center space-x-3">
+            <div className="relative">
+              <button className="p-2 rounded-full hover:bg-gray-100 transition-colors">
+                <Bell className="w-5 h-5 text-gray-600" />
+              </button>
+              {notifications.filter(n => !n.read).length > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                  {notifications.filter(n => !n.read).length}
+                </span>
+              )}
+            </div>
+            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+              <User className="w-5 h-5 text-green-600" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Contenido principal */}
+      <div className="pb-20">
+        <AnimatePresence mode="wait">
+          {renderContent()}
+        </AnimatePresence>
+      </div>
+
+      {/* Navegación inferior */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
+        <div className="grid grid-cols-4 gap-1 p-2">
+          {navigation.map((tab) => (
+            <TabButton
+              key={tab.id}
+              tab={tab}
+              isActive={activeTab === tab.id}
+              onClick={() => setActiveTab(tab.id)}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Toasts */}
+      <div className="fixed top-4 right-4 z-50 space-y-2">
+        {toasts.map((toast) => (
+          <Toast
+            key={toast.id}
+            message={toast.message}
+            type={toast.type}
+            visible={true}
+            onClose={() => hideToast(toast.id)}
+          />
+        ))}
+      </div>
+    </div>
+  );
 };
 
 // Componente principal de la aplicación
