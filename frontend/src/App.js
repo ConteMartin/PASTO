@@ -542,9 +542,13 @@ const BottomNavigation = ({ activeTab, onTabChange, userRole }) => {
   );
 };
 
-// Componente de Login/Registro mejorado
+// Componente de Login/Registro mejorado con Google OAuth
 const AuthForm = ({ onLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
+  const [showRoleSelection, setShowRoleSelection] = useState(false);
+  const [showPhoneVerification, setShowPhoneVerification] = useState(false);
+  const [googleUserInfo, setGoogleUserInfo] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -572,13 +576,71 @@ const AuthForm = ({ onLogin }) => {
       localStorage.setItem('access_token', response.data.access_token);
       localStorage.setItem('user_data', JSON.stringify(response.data.user));
       
-      onLogin(response.data.user);
+      // Si es registro y no es login, mostrar verificación de teléfono
+      if (!isLogin) {
+        setCurrentUser(response.data.user);
+        setShowPhoneVerification(true);
+      } else {
+        onLogin(response.data.user);
+      }
     } catch (err) {
       setError(err.response?.data?.detail || 'Error en la autenticación');
     } finally {
       setLoading(false);
     }
   };
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    try {
+      // Decodificar el JWT token de Google
+      const payload = JSON.parse(atob(credentialResponse.credential.split('.')[1]));
+      
+      setGoogleUserInfo(payload);
+      setShowRoleSelection(true);
+    } catch (error) {
+      setError('Error procesando autenticación con Google');
+    }
+  };
+
+  const handleGoogleError = () => {
+    setError('Error en autenticación con Google');
+  };
+
+  const handleRoleSelected = (user) => {
+    setCurrentUser(user);
+    setShowPhoneVerification(true);
+  };
+
+  const handlePhoneVerified = (phone) => {
+    // Actualizar el usuario con el teléfono verificado
+    const updatedUser = { ...currentUser, phone, phone_verified: true };
+    localStorage.setItem('user_data', JSON.stringify(updatedUser));
+    onLogin(updatedUser);
+  };
+
+  const handleSkipPhoneVerification = () => {
+    onLogin(currentUser);
+  };
+
+  // Mostrar selección de rol después de Google OAuth
+  if (showRoleSelection) {
+    return <RoleSelection onRoleSelected={handleRoleSelected} userInfo={googleUserInfo} />;
+  }
+
+  // Mostrar verificación de teléfono
+  if (showPhoneVerification) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50 flex items-center justify-center px-4">
+        <div className="max-w-md w-full">
+          <PhoneVerification 
+            onVerified={handlePhoneVerified}
+            onSkip={handleSkipPhoneVerification}
+            required={false}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50 flex items-center justify-center px-4">
@@ -600,6 +662,30 @@ const AuthForm = ({ onLogin }) => {
               {error}
             </div>
           )}
+
+          {/* Botón de Google OAuth */}
+          <div className="mb-6">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={handleGoogleError}
+              useOneTap={false}
+              theme="outline"
+              size="large"
+              width="100%"
+              text={isLogin ? "signin_with" : "signup_with"}
+              locale="es"
+            />
+          </div>
+
+          {/* Separador */}
+          <div className="relative mb-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-200"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-4 bg-white text-gray-500">o continúa con email</span>
+            </div>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {!isLogin && (
