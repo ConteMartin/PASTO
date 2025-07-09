@@ -46,12 +46,20 @@ oauth.register(
     }
 )
 
-# Configuración de Twilio
-twilio_client = TwilioClient(
-    os.environ.get('TWILIO_ACCOUNT_SID'),
-    os.environ.get('TWILIO_AUTH_TOKEN')
-)
+# Configuración de Twilio (opcional para desarrollo local)
+twilio_client = None
 TWILIO_VERIFY_SERVICE_SID = os.environ.get('TWILIO_VERIFY_SERVICE_SID')
+
+# Inicializar Twilio solo si las credenciales están disponibles
+if os.environ.get('TWILIO_ACCOUNT_SID') and os.environ.get('TWILIO_AUTH_TOKEN'):
+    try:
+        twilio_client = TwilioClient(
+            os.environ.get('TWILIO_ACCOUNT_SID'),
+            os.environ.get('TWILIO_AUTH_TOKEN')
+        )
+    except Exception as e:
+        print(f"Warning: Could not initialize Twilio client: {e}")
+        twilio_client = None
 
 # Configuración de la base de datos
 MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/')
