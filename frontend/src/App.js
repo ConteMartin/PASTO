@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { GoogleOAuthProvider, GoogleLogin, useGoogleLogin } from '@react-oauth/google';
 import axios from 'axios';
 import { 
   User, 
@@ -50,7 +51,9 @@ import {
   Scissors,
   Sparkles,
   TreePine,
-  Flower
+  Flower,
+  Shield,
+  Smartphone
 } from 'lucide-react';
 import './App.css';
 
