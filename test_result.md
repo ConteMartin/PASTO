@@ -179,6 +179,9 @@ backend:
       - working: false
         agent: "testing"
         comment: "Failed with 500 Internal Server Error when trying to list users as admin"
+      - working: false
+        agent: "testing"
+        comment: "Error details: MongoDB ObjectId serialization issue - 'ObjectId' object is not iterable"
 
   - task: "Admin - List Services"
     implemented: true
@@ -194,6 +197,9 @@ backend:
       - working: false
         agent: "testing"
         comment: "Failed with 500 Internal Server Error when trying to list services as admin"
+      - working: false
+        agent: "testing"
+        comment: "Error details: MongoDB ObjectId serialization issue - 'ObjectId' object is not iterable"
 
   - task: "Admin - Delete User"
     implemented: true
@@ -275,4 +281,6 @@ agent_communication:
     message: "Starting backend API testing for PASTO! application"
   - agent: "testing"
     message: "Completed initial backend testing. Most endpoints are working correctly, but admin endpoints are failing with 500 Internal Server Error."
+  - agent: "testing"
+    message: "Found the issue with admin endpoints: MongoDB ObjectId serialization error. The admin endpoints need to be fixed to properly serialize MongoDB ObjectId objects to JSON."
 ```
