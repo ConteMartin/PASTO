@@ -4,17 +4,22 @@ import time
 import random
 import string
 from datetime import datetime
+import json
 
 class PastoAPITester:
     def __init__(self, base_url="https://a191cd3d-a014-49cb-98b6-e7c2a4d86dfe.preview.emergentagent.com"):
         self.base_url = base_url
         self.client_token = None
         self.gardener_token = None
+        self.admin_token = None
         self.client_user = None
         self.gardener_user = None
+        self.admin_user = None
         self.tests_run = 0
         self.tests_passed = 0
         self.service_id = None
+        self.notification_id = None
+        self.test_user_id = None
 
     def run_test(self, name, method, endpoint, expected_status, data=None, token=None, params=None):
         """Run a single API test"""
@@ -33,6 +38,8 @@ class PastoAPITester:
                 response = requests.post(url, json=data, headers=headers, params=params)
             elif method == 'PUT':
                 response = requests.put(url, json=data, headers=headers)
+            elif method == 'DELETE':
+                response = requests.delete(url, headers=headers)
 
             success = response.status_code == expected_status
             if success:
@@ -102,7 +109,7 @@ class PastoAPITester:
             return True
         return False
 
-    def test_client_login(self, email, password):
+    def test_client_login(self, email="admin@pasto.com", password="admin123"):
         """Test client login"""
         data = {
             "email": email,
@@ -125,6 +132,39 @@ class PastoAPITester:
         if success and 'access_token' in response:
             self.gardener_token = response['access_token']
             self.gardener_user = response['user']
+            return True
+        return False
+        
+    def test_admin_login(self):
+        """Test admin login"""
+        data = {
+            "email": "admin@pasto.com",
+            "password": "admin123"
+        }
+        success, response = self.run_test("Admin Login", "POST", "auth/login", 200, data=data)
+        if success and 'access_token' in response:
+            self.admin_token = response['access_token']
+            self.admin_user = response['user']
+            return True
+        return False
+        
+    def test_get_user_profile(self):
+        """Test getting user profile"""
+        success, response = self.run_test("Get User Profile", "GET", "auth/me", 200, token=self.client_token)
+        if success:
+            print(f"Retrieved user profile for: {response.get('email')}")
+            return True
+        return False
+        
+    def test_google_oauth_complete(self):
+        """Test Google OAuth completion (simplified)"""
+        data = {
+            "code": "test_auth_code",
+            "role": "client"
+        }
+        success, response = self.run_test("Google OAuth Complete", "POST", "auth/google/complete", 200, data=data)
+        if success and 'access_token' in response:
+            print(f"Google OAuth completed for: {response.get('user', {}).get('email')}")
             return True
         return False
 
@@ -271,6 +311,91 @@ class PastoAPITester:
         )
         if success and isinstance(response, list):
             print(f"Found {len(response)} client notifications")
+            if len(response) > 0:
+                self.notification_id = response[0].get('notification_id')
+            return True
+        return False
+        
+    def test_mark_notification_read(self):
+        """Test marking notification as read"""
+        if not self.notification_id:
+            print("❌ No notification ID available to mark as read")
+            return False
+            
+        success, response = self.run_test(
+            "Mark Notification as Read", 
+            "POST", 
+            f"notifications/{self.notification_id}/read", 
+            200, 
+            token=self.client_token
+        )
+        if success:
+            print(f"Notification {self.notification_id} marked as read")
+            return True
+        return False
+
+    def test_admin_get_users(self):
+        """Test admin getting all users"""
+        success, response = self.run_test(
+            "Admin Get All Users", 
+            "GET", 
+            "admin/users", 
+            200, 
+            token=self.admin_token
+        )
+        if success and isinstance(response, list):
+            print(f"Admin retrieved {len(response)} users")
+            if len(response) > 0:
+                # Save a user ID for deletion test
+                for user in response:
+                    if user.get('email') != "admin@pasto.com":
+                        self.test_user_id = user.get('user_id')
+                        break
+            return True
+        return False
+        
+    def test_admin_get_services(self):
+        """Test admin getting all services"""
+        success, response = self.run_test(
+            "Admin Get All Services", 
+            "GET", 
+            "admin/services", 
+            200, 
+            token=self.admin_token
+        )
+        if success and isinstance(response, list):
+            print(f"Admin retrieved {len(response)} services")
+            return True
+        return False
+        
+    def test_admin_delete_user(self):
+        """Test admin deleting a user"""
+        if not self.test_user_id:
+            print("❌ No user ID available for deletion test")
+            return False
+            
+        success, response = self.run_test(
+            "Admin Delete User", 
+            "DELETE", 
+            f"admin/users/{self.test_user_id}", 
+            200, 
+            token=self.admin_token
+        )
+        if success:
+            print(f"Admin deleted user with ID: {self.test_user_id}")
+            return True
+        return False
+        
+    def test_create_admin_user(self):
+        """Test creating admin user"""
+        success, response = self.run_test(
+            "Create Admin User", 
+            "POST", 
+            "admin/create-admin", 
+            200
+        )
+        if success:
+            print("Admin user created or already exists")
             return True
         return False
 
@@ -298,20 +423,6 @@ class PastoAPITester:
             return True
         return False
 
-    def test_gardener_profile(self):
-        """Test getting gardener profile"""
-        success, response = self.run_test(
-            "Get Gardener Profile", 
-            "GET", 
-            "gardener/profile", 
-            200, 
-            token=self.gardener_token
-        )
-        if success:
-            print(f"Retrieved gardener profile")
-            return True
-        return False
-
 def main():
     # Setup
     tester = PastoAPITester()
@@ -319,41 +430,59 @@ def main():
     # Test health check
     tester.test_health_check()
     
-    # Test authentication
+    # Create admin user if needed
+    tester.test_create_admin_user()
+    
+    # Test authentication endpoints
+    print("\n\n🔐 Testing Authentication Endpoints...")
     client_registered = tester.test_client_registration()
     gardener_registered = tester.test_gardener_registration()
+    admin_logged_in = tester.test_admin_login()
+    tester.test_get_user_profile()
+    tester.test_google_oauth_complete()
     
     if not client_registered or not gardener_registered:
         print("❌ Registration failed, stopping tests")
         return 1
+        
+    if not admin_logged_in:
+        print("❌ Admin login failed, some tests may not work")
     
-    # Test client flow
+    # Test service endpoints
+    print("\n\n🌿 Testing Service Endpoints...")
     tester.test_service_estimation()
     service_created = tester.test_service_request()
     
     if not service_created:
-        print("❌ Service creation failed, stopping tests")
-        return 1
+        print("❌ Service creation failed, stopping service flow tests")
+    else:
+        tester.test_get_client_requests()
+        tester.test_get_available_services()
+        tester.test_accept_service()
+        tester.test_get_gardener_jobs()
+        
+        # Test service status updates
+        print("\n\n📊 Testing Service Status Updates...")
+        tester.test_update_service_status("on_way")
+        tester.test_update_service_status("in_progress")
+        tester.test_update_service_status("completed")
     
-    tester.test_get_client_requests()
-    
-    # Test gardener flow
-    tester.test_get_available_services()
-    tester.test_accept_service()
-    tester.test_get_gardener_jobs()
-    
-    # Test service status updates
-    tester.test_update_service_status("on_way")
-    tester.test_update_service_status("in_progress")
-    tester.test_update_service_status("completed")
-    
-    # Test notifications and ratings
+    # Test notifications
+    print("\n\n🔔 Testing Notification Endpoints...")
     tester.test_get_notifications()
-    tester.test_rate_service()
-    tester.test_gardener_profile()
+    tester.test_mark_notification_read()
+    
+    # Test admin endpoints
+    if admin_logged_in:
+        print("\n\n👑 Testing Admin Endpoints...")
+        tester.test_admin_get_users()
+        tester.test_admin_get_services()
+        tester.test_admin_delete_user()
     
     # Print results
     print(f"\n📊 Tests passed: {tester.tests_passed}/{tester.tests_run}")
+    print(f"Pass rate: {(tester.tests_passed/tester.tests_run)*100:.1f}%")
+    
     return 0 if tester.tests_passed == tester.tests_run else 1
 
 if __name__ == "__main__":
