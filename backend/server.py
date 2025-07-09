@@ -134,6 +134,9 @@ class UserProfile(BaseModel):
     full_name: str
     role: UserRole
     phone: Optional[str] = None
+    phone_verified: bool = False
+    auth_provider: AuthProvider = AuthProvider.EMAIL
+    google_id: Optional[str] = None
     created_at: datetime
     is_active: bool = True
     avatar_url: Optional[str] = None
