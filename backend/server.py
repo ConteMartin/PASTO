@@ -411,7 +411,25 @@ def send_sms_verification(phone_number: str) -> dict:
 
 def verify_sms_code(phone_number: str, code: str) -> bool:
     """Verificar código SMS"""
-    if not TWILIO_VERIFY_SERVICE_SID:
+    # Para desarrollo local, aceptar código 123456
+    if not twilio_client or not TWILIO_VERIFY_SERVICE_SID:
+        verification = db.phone_verifications.find_one({
+            "phone_number": phone_number,
+            "verified": False
+        })
+        
+        if verification and code == "123456":
+            db.phone_verifications.update_one(
+                {"phone_number": phone_number, "verified": False},
+                {"$set": {"verified": True, "verified_at": datetime.utcnow()}}
+            )
+            
+            # Actualizar usuario si existe
+            db.users.update_one(
+                {"phone": phone_number},
+                {"$set": {"phone_verified": True}}
+            )
+            return True
         return False
     
     try:
