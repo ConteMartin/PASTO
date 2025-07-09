@@ -686,7 +686,21 @@ async def verify_phone_code(verify_data: PhoneVerificationCheck):
 @app.post("/api/auth/login")
 async def login_user(user_data: UserLogin):
     user = db.users.find_one({"email": user_data.email})
-    if not user or not verify_password(user_data.password, user["password"]):
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email o contraseña incorrectos"
+        )
+    
+    # Verificar si el usuario usa autenticación con Google
+    if user.get("auth_provider") == AuthProvider.GOOGLE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Este usuario debe iniciar sesión con Google"
+        )
+    
+    # Verificar contraseña
+    if not user.get("password") or not verify_password(user_data.password, user["password"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email o contraseña incorrectos"
@@ -703,6 +717,9 @@ async def login_user(user_data: UserLogin):
             full_name=user["full_name"],
             role=user["role"],
             phone=user.get("phone"),
+            phone_verified=user.get("phone_verified", False),
+            auth_provider=user.get("auth_provider", AuthProvider.EMAIL),
+            google_id=user.get("google_id"),
             created_at=user["created_at"],
             is_active=user["is_active"],
             avatar_url=user.get("avatar_url"),
