@@ -1933,7 +1933,11 @@ const App = () => {
   }
 
   if (!user) {
-    return <AuthForm onLogin={handleLogin} />;
+    return (
+      <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID || "your_google_client_id_here"}>
+        <AuthForm onLogin={handleLogin} />
+      </GoogleOAuthProvider>
+    );
   }
 
   return (
