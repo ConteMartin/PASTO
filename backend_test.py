@@ -7,7 +7,7 @@ from datetime import datetime
 import json
 
 class PastoAPITester:
-    def __init__(self, base_url="https://a191cd3d-a014-49cb-98b6-e7c2a4d86dfe.preview.emergentagent.com"):
+    def __init__(self, base_url="https://8c0b897f-9481-473a-aee0-612b83ee3b64.preview.emergentagent.com"):
         self.base_url = base_url
         self.client_token = None
         self.gardener_token = None
