@@ -1124,6 +1124,89 @@ async def update_gardener_profile(
     updated_gardener = db.gardeners.find_one({"user_id": current_user["user_id"]})
     return GardenerProfile(**updated_gardener)
 
+@app.post("/api/admin/create-admin")
+async def create_admin():
+    """Crear usuario administrador (solo para configuración inicial)"""
+    admin_email = "admin@pasto.com"
+    admin_password = "admin123"
+    
+    # Verificar si ya existe
+    existing_admin = db.users.find_one({"email": admin_email})
+    if existing_admin:
+        return {"message": "El usuario administrador ya existe"}
+    
+    # Crear usuario administrador
+    user_id = str(uuid.uuid4())
+    hashed_password = hash_password(admin_password)
+    
+    admin_doc = {
+        "user_id": user_id,
+        "email": admin_email,
+        "password": hashed_password,
+        "full_name": "Administrador PASTO",
+        "role": UserRole.ADMIN,
+        "phone": "+57123456789",
+        "phone_verified": True,
+        "auth_provider": AuthProvider.EMAIL,
+        "google_id": None,
+        "created_at": datetime.utcnow(),
+        "is_active": True,
+        "avatar_url": None,
+        "rating": 5.0,
+        "total_ratings": 1
+    }
+    
+    db.users.insert_one(admin_doc)
+    
+    return {
+        "message": "Usuario administrador creado exitosamente",
+        "email": admin_email,
+        "password": admin_password,
+        "user_id": user_id
+    }
+
+@app.get("/api/admin/users")
+async def get_all_users(current_user: dict = Depends(get_current_user)):
+    """Obtener todos los usuarios (solo admin)"""
+    if current_user["role"] != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo los administradores pueden ver todos los usuarios"
+        )
+    
+    users = list(db.users.find({}, {"password": 0}))  # No incluir passwords
+    return users
+
+@app.get("/api/admin/services")
+async def get_all_services(current_user: dict = Depends(get_current_user)):
+    """Obtener todos los servicios (solo admin)"""
+    if current_user["role"] != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo los administradores pueden ver todos los servicios"
+        )
+    
+    services = list(db.services.find({}))
+    return services
+
+@app.delete("/api/admin/users/{user_id}")
+async def delete_user(user_id: str, current_user: dict = Depends(get_current_user)):
+    """Eliminar usuario (solo admin)"""
+    if current_user["role"] != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo los administradores pueden eliminar usuarios"
+        )
+    
+    result = db.users.delete_one({"user_id": user_id})
+    if result.deleted_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario no encontrado"
+        )
+    
+    return {"message": "Usuario eliminado exitosamente"}
+
 @app.post("/api/upload/image")
 async def upload_image(
     file: UploadFile = File(...),
