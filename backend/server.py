@@ -986,6 +986,12 @@ async def get_all_users(current_user: dict = Depends(get_current_user)):
         )
     
     users = list(db.users.find({}, {"password": 0}))  # No incluir passwords
+    
+    # Convert MongoDB ObjectId to string
+    for user in users:
+        if "_id" in user:
+            user["_id"] = str(user["_id"])
+    
     return users
 
 @app.get("/api/admin/services")
@@ -998,6 +1004,12 @@ async def get_all_services(current_user: dict = Depends(get_current_user)):
         )
     
     services = list(db.services.find({}))
+    
+    # Convert MongoDB ObjectId to string
+    for service in services:
+        if "_id" in service:
+            service["_id"] = str(service["_id"])
+    
     return services
 
 @app.delete("/api/admin/users/{user_id}")
