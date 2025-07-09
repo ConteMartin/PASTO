@@ -1941,7 +1941,8 @@ const App = () => {
   }
 
   return (
-    <Router>
+    <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID || "your_google_client_id_here"}>
+      <Router>
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
         <header className="bg-white shadow-sm border-b border-gray-200 safe-top">
