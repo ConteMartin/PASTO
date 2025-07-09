@@ -683,6 +683,40 @@ async def verify_phone_code(verify_data: PhoneVerificationCheck):
             detail=f"Error verificando código: {str(e)}"
         )
 
+@app.post("/api/auth/phone/associate")
+async def associate_phone_with_user(
+    verify_data: PhoneVerificationCheck,
+    current_user: dict = Depends(get_current_user)
+):
+    """Asociar teléfono verificado con usuario actual"""
+    try:
+        is_valid = verify_sms_code(verify_data.phone_number, verify_data.code)
+        
+        if is_valid:
+            # Actualizar usuario con teléfono verificado
+            db.users.update_one(
+                {"user_id": current_user["user_id"]},
+                {"$set": {
+                    "phone": verify_data.phone_number,
+                    "phone_verified": True
+                }}
+            )
+            
+            return {
+                "verified": True,
+                "message": "Teléfono asociado exitosamente"
+            }
+        else:
+            return {
+                "verified": False,
+                "message": "Código inválido o expirado"
+            }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error asociando teléfono: {str(e)}"
+        )
+
 @app.post("/api/auth/login")
 async def login_user(user_data: UserLogin):
     user = db.users.find_one({"email": user_data.email})
