@@ -74,6 +74,7 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 class UserRole(str, Enum):
     CLIENT = "client"
     GARDENER = "gardener"
+    ADMIN = "admin"
 
 class ServiceType(str, Enum):
     GRASS_CUTTING = "grass_cutting"
