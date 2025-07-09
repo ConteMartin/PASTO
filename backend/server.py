@@ -31,6 +31,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Middleware para sesiones (necesario para OAuth)
+app.add_middleware(SessionMiddleware, secret_key=os.environ.get('JWT_SECRET', 'pasto_secret_key_2024'))
+
+# Configuración de OAuth
+oauth = OAuth()
+oauth.register(
+    name='google',
+    client_id=os.environ.get('GOOGLE_CLIENT_ID'),
+    client_secret=os.environ.get('GOOGLE_CLIENT_SECRET'),
+    server_metadata_url='https://accounts.google.com/.well-known/openid_configuration',
+    client_kwargs={
+        'scope': 'openid email profile'
+    }
+)
+
+# Configuración de Twilio
+twilio_client = TwilioClient(
+    os.environ.get('TWILIO_ACCOUNT_SID'),
+    os.environ.get('TWILIO_AUTH_TOKEN')
+)
+TWILIO_VERIFY_SERVICE_SID = os.environ.get('TWILIO_VERIFY_SERVICE_SID')
+
 # Configuración de la base de datos
 MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/')
 client = MongoClient(MONGO_URL)
