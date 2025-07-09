@@ -530,6 +530,9 @@ async def register_user(user_data: UserRegistration):
         "full_name": user_data.full_name,
         "role": user_data.role,
         "phone": user_data.phone,
+        "phone_verified": False,
+        "auth_provider": AuthProvider.EMAIL,
+        "google_id": None,
         "created_at": datetime.utcnow(),
         "is_active": True,
         "avatar_url": None,
@@ -569,10 +572,116 @@ async def register_user(user_data: UserRegistration):
             full_name=user_data.full_name,
             role=user_data.role,
             phone=user_data.phone,
+            phone_verified=False,
+            auth_provider=AuthProvider.EMAIL,
             created_at=datetime.utcnow(),
             is_active=True
         )
     }
+
+@app.get("/api/auth/google/login")
+async def google_login(request: Request):
+    """Iniciar flujo de autenticación con Google"""
+    if not os.environ.get('GOOGLE_CLIENT_ID') or not os.environ.get('GOOGLE_CLIENT_SECRET'):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Autenticación con Google no configurada"
+        )
+    
+    redirect_uri = request.url_for('google_callback')
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+@app.get("/api/auth/google/callback")
+async def google_callback(request: Request):
+    """Callback de autenticación con Google"""
+    try:
+        token = await oauth.google.authorize_access_token(request)
+        user_info = token.get('userinfo')
+        
+        if not user_info:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No se pudo obtener información del usuario"
+            )
+        
+        # Retornar información del usuario para que el frontend la procese
+        return {
+            "user_info": user_info,
+            "message": "Autenticación exitosa. Selecciona tu rol."
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error en autenticación con Google: {str(e)}"
+        )
+
+@app.post("/api/auth/google/complete")
+async def google_complete_auth(auth_data: GoogleAuthRequest):
+    """Completar autenticación con Google"""
+    try:
+        # En un escenario real, aquí decodificarías el code del frontend
+        # Por ahora, simulamos que recibimos la información del usuario
+        # Este endpoint será actualizado cuando tengas las credenciales reales
+        
+        # Simular datos de usuario de Google (reemplazar con decodificación real)
+        google_user = {
+            "sub": "google_user_id_" + str(uuid.uuid4()),
+            "email": "user@example.com",
+            "name": "Usuario Google",
+            "picture": "https://example.com/avatar.jpg"
+        }
+        
+        user_doc = create_or_update_user_from_google(google_user, auth_data.role)
+        access_token = create_access_token(data={"sub": user_doc["user_id"]})
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": UserProfile(**user_doc)
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error completando autenticación: {str(e)}"
+        )
+
+@app.post("/api/auth/phone/send-verification")
+async def send_phone_verification(phone_data: PhoneVerificationRequest):
+    """Enviar código de verificación SMS"""
+    try:
+        result = send_sms_verification(phone_data.phone_number)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error enviando verificación: {str(e)}"
+        )
+
+@app.post("/api/auth/phone/verify")
+async def verify_phone_code(verify_data: PhoneVerificationCheck):
+    """Verificar código SMS"""
+    try:
+        is_valid = verify_sms_code(verify_data.phone_number, verify_data.code)
+        
+        if is_valid:
+            return {
+                "verified": True,
+                "message": "Teléfono verificado exitosamente"
+            }
+        else:
+            return {
+                "verified": False,
+                "message": "Código inválido o expirado"
+            }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error verificando código: {str(e)}"
+        )
 
 @app.post("/api/auth/login")
 async def login_user(user_data: UserLogin):
