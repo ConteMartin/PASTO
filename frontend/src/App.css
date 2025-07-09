@@ -468,7 +468,7 @@ body {
 }
 
 .hover-lift:hover {
-  @apply transform translate-y-(-2px) shadow-lg;
+  @apply transform -translate-y-0.5 shadow-lg;
 }
 
 .hover-glow {
