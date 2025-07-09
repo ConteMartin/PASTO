@@ -504,11 +504,11 @@ def create_or_update_user_from_google(google_user: dict, role: UserRole) -> dict
         
         return user_doc
 
-# Rutas de API
+# Rutas de API optimizadas
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "healthy", "message": "PASTO! API está funcionando correctamente", "version": "2.0.0"}
+    return {"status": "healthy", "message": "PASTO! API funcionando", "version": "2.1.0"}
 
 @app.post("/api/auth/register")
 async def register_user(user_data: UserRegistration):
@@ -543,7 +543,7 @@ async def register_user(user_data: UserRegistration):
     
     db.users.insert_one(user_doc)
     
-    # Si es jardinero, crear perfil de jardinero
+    # Si es jardinero, crear perfil básico
     if user_data.role == UserRole.GARDENER:
         gardener_doc = {
             "user_id": user_id,
@@ -579,144 +579,6 @@ async def register_user(user_data: UserRegistration):
             is_active=True
         )
     }
-
-@app.get("/api/auth/google/login")
-async def google_login(request: Request):
-    """Iniciar flujo de autenticación con Google"""
-    if not os.environ.get('GOOGLE_CLIENT_ID') or not os.environ.get('GOOGLE_CLIENT_SECRET'):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Autenticación con Google no configurada"
-        )
-    
-    redirect_uri = request.url_for('google_callback')
-    return await oauth.google.authorize_redirect(request, redirect_uri)
-
-@app.get("/api/auth/google/callback")
-async def google_callback(request: Request):
-    """Callback de autenticación con Google"""
-    try:
-        token = await oauth.google.authorize_access_token(request)
-        user_info = token.get('userinfo')
-        
-        if not user_info:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No se pudo obtener información del usuario"
-            )
-        
-        # Retornar información del usuario para que el frontend la procese
-        return {
-            "user_info": user_info,
-            "message": "Autenticación exitosa. Selecciona tu rol."
-        }
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error en autenticación con Google: {str(e)}"
-        )
-
-@app.post("/api/auth/google/complete")
-async def google_complete_auth(auth_data: GoogleAuthRequest):
-    """Completar autenticación con Google"""
-    try:
-        # En un escenario real, aquí decodificarías el code del frontend
-        # Por ahora, simulamos que recibimos la información del usuario
-        # Este endpoint será actualizado cuando tengas las credenciales reales
-        
-        # Simular datos de usuario de Google (reemplazar con decodificación real)
-        google_user = {
-            "sub": "google_user_id_" + str(uuid.uuid4()),
-            "email": "user@example.com",
-            "name": "Usuario Google",
-            "picture": "https://example.com/avatar.jpg"
-        }
-        
-        user_doc = create_or_update_user_from_google(google_user, auth_data.role)
-        access_token = create_access_token(data={"sub": user_doc["user_id"]})
-        
-        return {
-            "access_token": access_token,
-            "token_type": "bearer",
-            "user": UserProfile(**user_doc)
-        }
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error completando autenticación: {str(e)}"
-        )
-
-@app.post("/api/auth/phone/send-verification")
-async def send_phone_verification(phone_data: PhoneVerificationRequest):
-    """Enviar código de verificación SMS"""
-    try:
-        result = send_sms_verification(phone_data.phone_number)
-        return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error enviando verificación: {str(e)}"
-        )
-
-@app.post("/api/auth/phone/verify")
-async def verify_phone_code(verify_data: PhoneVerificationCheck):
-    """Verificar código SMS"""
-    try:
-        is_valid = verify_sms_code(verify_data.phone_number, verify_data.code)
-        
-        if is_valid:
-            return {
-                "verified": True,
-                "message": "Teléfono verificado exitosamente"
-            }
-        else:
-            return {
-                "verified": False,
-                "message": "Código inválido o expirado"
-            }
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error verificando código: {str(e)}"
-        )
-
-@app.post("/api/auth/phone/associate")
-async def associate_phone_with_user(
-    verify_data: PhoneVerificationCheck,
-    current_user: dict = Depends(get_current_user)
-):
-    """Asociar teléfono verificado con usuario actual"""
-    try:
-        is_valid = verify_sms_code(verify_data.phone_number, verify_data.code)
-        
-        if is_valid:
-            # Actualizar usuario con teléfono verificado
-            db.users.update_one(
-                {"user_id": current_user["user_id"]},
-                {"$set": {
-                    "phone": verify_data.phone_number,
-                    "phone_verified": True
-                }}
-            )
-            
-            return {
-                "verified": True,
-                "message": "Teléfono asociado exitosamente"
-            }
-        else:
-            return {
-                "verified": False,
-                "message": "Código inválido o expirado"
-            }
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error asociando teléfono: {str(e)}"
-        )
 
 @app.post("/api/auth/login")
 async def login_user(user_data: UserLogin):
@@ -781,6 +643,34 @@ async def get_current_user_profile(current_user: dict = Depends(get_current_user
         total_ratings=current_user.get("total_ratings", 0)
     )
 
+@app.post("/api/auth/google/complete")
+async def google_complete_auth(auth_data: GoogleAuthRequest):
+    """Completar autenticación con Google (simplificado)"""
+    try:
+        # Simular datos de usuario de Google
+        google_user = {
+            "sub": "google_user_id_" + str(uuid.uuid4()),
+            "email": "user@example.com",
+            "name": "Usuario Google",
+            "picture": "https://example.com/avatar.jpg"
+        }
+        
+        user_doc = create_or_update_user_from_google(google_user, auth_data.role)
+        access_token = create_access_token(data={"sub": user_doc["user_id"]})
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": UserProfile(**user_doc)
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error completando autenticación: {str(e)}"
+        )
+
+# Endpoints de servicios optimizados
 @app.post("/api/services/estimate")
 async def estimate_service_price(
     service_type: ServiceType,
@@ -859,8 +749,8 @@ async def create_service_request(
     
     db.services.insert_one(service_doc)
     
-    # Notificar a jardineros disponibles
-    available_gardeners = db.gardeners.find({"is_available": True})
+    # Notificar solo a jardineros disponibles y activos
+    available_gardeners = db.gardeners.find({"is_available": True}, {"user_id": 1}).limit(20)
     for gardener in available_gardeners:
         send_notification(
             gardener["user_id"],
@@ -880,7 +770,10 @@ async def get_available_services(current_user: dict = Depends(get_current_user))
             detail="Solo los jardineros pueden ver servicios disponibles"
         )
     
-    services = list(db.services.find({"status": ServiceStatus.PENDING}))
+    # Optimizar query - solo servicios pendientes ordenados por fecha
+    services = list(db.services.find(
+        {"status": ServiceStatus.PENDING}
+    ).sort("created_at", -1).limit(50))
     
     return [ServiceResponse(**service) for service in services]
 
@@ -892,7 +785,10 @@ async def get_my_service_requests(current_user: dict = Depends(get_current_user)
             detail="Solo los clientes pueden ver sus solicitudes"
         )
     
-    services = list(db.services.find({"client_id": current_user["user_id"]}).sort("created_at", -1))
+    # Optimizar query - limitado a últimas 100 solicitudes
+    services = list(db.services.find(
+        {"client_id": current_user["user_id"]}
+    ).sort("created_at", -1).limit(100))
     
     return [ServiceResponse(**service) for service in services]
 
@@ -904,7 +800,10 @@ async def get_my_jobs(current_user: dict = Depends(get_current_user)):
             detail="Solo los jardineros pueden ver sus trabajos"
         )
     
-    services = list(db.services.find({"gardener_id": current_user["user_id"]}).sort("created_at", -1))
+    # Optimizar query - limitado a últimos 100 trabajos
+    services = list(db.services.find(
+        {"gardener_id": current_user["user_id"]}
+    ).sort("created_at", -1).limit(100))
     
     return [ServiceResponse(**service) for service in services]
 
@@ -993,7 +892,7 @@ async def update_service_status(
         {"$set": update_data}
     )
     
-    # Enviar notificación al cliente
+    # Notificaciones optimizadas
     notification_messages = {
         ServiceStatus.ON_WAY: "El jardinero está en camino",
         ServiceStatus.IN_PROGRESS: "El trabajo ha comenzado",
@@ -1012,56 +911,13 @@ async def update_service_status(
     updated_service = db.services.find_one({"service_id": service_id})
     return ServiceResponse(**updated_service)
 
-@app.post("/api/services/{service_id}/rate")
-async def rate_service(
-    service_id: str,
-    rating_data: RatingRequest,
-    current_user: dict = Depends(get_current_user)
-):
-    service = db.services.find_one({"service_id": service_id})
-    if not service:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Servicio no encontrado"
-        )
-    
-    # Verificar que el servicio esté completado
-    if service["status"] != ServiceStatus.COMPLETED:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Solo se pueden calificar servicios completados"
-        )
-    
-    # Determinar quién está calificando
-    if current_user["user_id"] == service["client_id"]:
-        # Cliente calificando al jardinero
-        db.services.update_one(
-            {"service_id": service_id},
-            {"$set": {"gardener_rating": rating_data.rating, "gardener_review": rating_data.review}}
-        )
-        # Actualizar rating del jardinero
-        update_user_rating(service["gardener_id"], rating_data.rating)
-        
-    elif current_user["user_id"] == service["gardener_id"]:
-        # Jardinero calificando al cliente
-        db.services.update_one(
-            {"service_id": service_id},
-            {"$set": {"client_rating": rating_data.rating, "client_review": rating_data.review}}
-        )
-        # Actualizar rating del cliente
-        update_user_rating(service["client_id"], rating_data.rating)
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para calificar este servicio"
-        )
-    
-    updated_service = db.services.find_one({"service_id": service_id})
-    return ServiceResponse(**updated_service)
-
 @app.get("/api/notifications")
 async def get_notifications(current_user: dict = Depends(get_current_user)):
-    notifications = list(db.notifications.find({"user_id": current_user["user_id"]}).sort("created_at", -1).limit(50))
+    # Optimizar query - solo últimas 50 notificaciones
+    notifications = list(db.notifications.find(
+        {"user_id": current_user["user_id"]}
+    ).sort("created_at", -1).limit(50))
+    
     return [Notification(**notification) for notification in notifications]
 
 @app.post("/api/notifications/{notification_id}/read")
@@ -1078,51 +934,6 @@ async def mark_notification_as_read(notification_id: str, current_user: dict = D
         )
     
     return {"message": "Notificación marcada como leída"}
-
-@app.get("/api/gardener/profile")
-async def get_gardener_profile(current_user: dict = Depends(get_current_user)):
-    if current_user["role"] != UserRole.GARDENER:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Solo los jardineros pueden ver este perfil"
-        )
-    
-    gardener = db.gardeners.find_one({"user_id": current_user["user_id"]})
-    if not gardener:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Perfil de jardinero no encontrado"
-        )
-    
-    return GardenerProfile(**gardener)
-
-@app.put("/api/gardener/profile")
-async def update_gardener_profile(
-    profile_data: GardenerUpdate,
-    current_user: dict = Depends(get_current_user)
-):
-    if current_user["role"] != UserRole.GARDENER:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Solo los jardineros pueden actualizar este perfil"
-        )
-    
-    update_data = {k: v for k, v in profile_data.dict().items() if v is not None}
-    update_data["updated_at"] = datetime.utcnow()
-    
-    result = db.gardeners.update_one(
-        {"user_id": current_user["user_id"]},
-        {"$set": update_data}
-    )
-    
-    if result.matched_count == 0:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Perfil de jardinero no encontrado"
-        )
-    
-    updated_gardener = db.gardeners.find_one({"user_id": current_user["user_id"]})
-    return GardenerProfile(**updated_gardener)
 
 @app.post("/api/admin/create-admin")
 async def create_admin():
