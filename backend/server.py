@@ -354,6 +354,155 @@ def update_user_rating(user_id: str, new_rating: int):
             {"$set": {"rating": round(new_average, 1), "total_ratings": new_total}}
         )
 
+def validate_phone_number(phone: str) -> bool:
+    """Validar formato de número de teléfono E.164"""
+    pattern = r'^\+[1-9]\d{1,14}$'
+    return re.match(pattern, phone) is not None
+
+def send_sms_verification(phone_number: str) -> dict:
+    """Enviar código de verificación SMS"""
+    if not validate_phone_number(phone_number):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Formato de número de teléfono inválido. Use formato E.164 (+1234567890)"
+        )
+    
+    if not TWILIO_VERIFY_SERVICE_SID:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Servicio de verificación SMS no configurado"
+        )
+    
+    try:
+        verification = twilio_client.verify.services(TWILIO_VERIFY_SERVICE_SID).verifications.create(
+            to=phone_number,
+            channel='sms'
+        )
+        
+        # Guardar intento de verificación en la base de datos
+        db.phone_verifications.insert_one({
+            "phone_number": phone_number,
+            "status": verification.status,
+            "created_at": datetime.utcnow(),
+            "verified": False
+        })
+        
+        return {"status": verification.status, "phone_number": phone_number}
+    except TwilioException as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error al enviar SMS: {str(e)}"
+        )
+
+def verify_sms_code(phone_number: str, code: str) -> bool:
+    """Verificar código SMS"""
+    if not TWILIO_VERIFY_SERVICE_SID:
+        return False
+    
+    try:
+        check = twilio_client.verify.services(TWILIO_VERIFY_SERVICE_SID).verification_checks.create(
+            to=phone_number,
+            code=code
+        )
+        
+        is_valid = check.status == "approved"
+        
+        # Actualizar estado de verificación
+        if is_valid:
+            db.phone_verifications.update_one(
+                {"phone_number": phone_number, "verified": False},
+                {"$set": {"verified": True, "verified_at": datetime.utcnow()}}
+            )
+            
+            # Actualizar usuario si existe
+            db.users.update_one(
+                {"phone": phone_number},
+                {"$set": {"phone_verified": True}}
+            )
+        
+        return is_valid
+    except TwilioException:
+        return False
+
+def create_or_update_user_from_google(google_user: dict, role: UserRole) -> dict:
+    """Crear o actualizar usuario desde datos de Google"""
+    email = google_user.get('email')
+    google_id = google_user.get('sub')
+    
+    if not email or not google_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Datos de Google incompletos"
+        )
+    
+    # Buscar usuario existente por email o google_id
+    existing_user = db.users.find_one({
+        "$or": [
+            {"email": email},
+            {"google_id": google_id}
+        ]
+    })
+    
+    if existing_user:
+        # Actualizar datos de Google si no están presentes
+        update_data = {}
+        if not existing_user.get("google_id"):
+            update_data["google_id"] = google_id
+            update_data["auth_provider"] = AuthProvider.GOOGLE
+        
+        if not existing_user.get("avatar_url") and google_user.get("picture"):
+            update_data["avatar_url"] = google_user.get("picture")
+        
+        if update_data:
+            db.users.update_one(
+                {"user_id": existing_user["user_id"]},
+                {"$set": update_data}
+            )
+            existing_user.update(update_data)
+        
+        return existing_user
+    else:
+        # Crear nuevo usuario
+        user_id = str(uuid.uuid4())
+        user_doc = {
+            "user_id": user_id,
+            "email": email,
+            "password": None,  # No password for Google users
+            "full_name": google_user.get('name', ''),
+            "role": role,
+            "phone": None,
+            "phone_verified": False,
+            "auth_provider": AuthProvider.GOOGLE,
+            "google_id": google_id,
+            "created_at": datetime.utcnow(),
+            "is_active": True,
+            "avatar_url": google_user.get('picture'),
+            "rating": 0.0,
+            "total_ratings": 0
+        }
+        
+        db.users.insert_one(user_doc)
+        
+        # Si es jardinero, crear perfil de jardinero
+        if role == UserRole.GARDENER:
+            gardener_doc = {
+                "user_id": user_id,
+                "tools": [],
+                "coverage_areas": [],
+                "base_rates": {},
+                "availability": {},
+                "is_available": True,
+                "rating": 0.0,
+                "completed_jobs": 0,
+                "specialties": [],
+                "bio": None,
+                "years_experience": 0,
+                "created_at": datetime.utcnow()
+            }
+            db.gardeners.insert_one(gardener_doc)
+        
+        return user_doc
+
 # Rutas de API
 
 @app.get("/api/health")
