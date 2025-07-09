@@ -109,7 +109,296 @@ const Loading = ({ size = 'md' }) => {
   );
 };
 
-// Componente Rating con estrellas
+// Componente para verificación de teléfono
+const PhoneVerification = ({ onVerified, onSkip, required = false }) => {
+  const [step, setStep] = useState(1);
+  const [phone, setPhone] = useState('');
+  const [code, setCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const formatPhoneNumber = (value) => {
+    // Remove all non-digit characters
+    const digits = value.replace(/\D/g, '');
+    
+    // Add + prefix if not present
+    if (digits.length > 0 && !value.startsWith('+')) {
+      return '+' + digits;
+    }
+    
+    return value;
+  };
+
+  const handleSendCode = async () => {
+    if (!phone || phone.length < 10) {
+      setError('Por favor ingresa un número de teléfono válido');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      await axios.post('/api/auth/phone/send-verification', {
+        phone_number: phone
+      });
+      
+      setStep(2);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Error enviando código de verificación');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyCode = async () => {
+    if (!code || code.length < 4) {
+      setError('Por favor ingresa el código de verificación');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await axios.post('/api/auth/phone/verify', {
+        phone_number: phone,
+        code: code
+      });
+
+      if (response.data.verified) {
+        onVerified(phone);
+      } else {
+        setError('Código inválido o expirado');
+      }
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Error verificando código');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-3xl shadow-xl p-8 border border-green-100">
+      <div className="text-center mb-6">
+        <div className="w-16 h-16 bg-green-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+          <Smartphone className="w-8 h-8 text-green-600" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Verificar Teléfono</h2>
+        <p className="text-gray-600">
+          {step === 1 
+            ? 'Ingresa tu número de teléfono para verificar tu identidad'
+            : 'Ingresa el código enviado a tu teléfono'
+          }
+        </p>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6 flex items-center">
+          <AlertCircle className="w-5 h-5 mr-2" />
+          {error}
+        </div>
+      )}
+
+      {step === 1 && (
+        <div className="space-y-6">
+          <div className="form-group">
+            <label className="form-label">
+              <Phone className="w-4 h-4 inline mr-2" />
+              Número de teléfono
+            </label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(formatPhoneNumber(e.target.value))}
+              className="form-input"
+              placeholder="+54 11 1234-5678"
+              required
+            />
+            <p className="text-sm text-gray-500 mt-1">
+              Incluye el código de país (ej: +54 para Argentina)
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <button
+              onClick={handleSendCode}
+              disabled={loading || !phone}
+              className="w-full bg-green-600 text-white py-3 px-6 rounded-xl hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-200 disabled:opacity-50 transition-all duration-200 font-medium flex items-center justify-center"
+            >
+              {loading ? (
+                <Loading size="sm" />
+              ) : (
+                <>
+                  <Send className="w-5 h-5 mr-2" />
+                  Enviar código
+                </>
+              )}
+            </button>
+
+            {!required && (
+              <button
+                onClick={onSkip}
+                className="w-full bg-gray-100 text-gray-700 py-3 px-6 rounded-xl hover:bg-gray-200 transition-all duration-200 font-medium"
+              >
+                Omitir por ahora
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="space-y-6">
+          <div className="form-group">
+            <label className="form-label">
+              <Shield className="w-4 h-4 inline mr-2" />
+              Código de verificación
+            </label>
+            <input
+              type="text"
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+              className="form-input text-center text-2xl tracking-widest"
+              placeholder="000000"
+              maxLength="6"
+              required
+            />
+            <p className="text-sm text-gray-500 mt-1">
+              Código enviado a {phone}
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <button
+              onClick={handleVerifyCode}
+              disabled={loading || !code}
+              className="w-full bg-green-600 text-white py-3 px-6 rounded-xl hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-200 disabled:opacity-50 transition-all duration-200 font-medium flex items-center justify-center"
+            >
+              {loading ? (
+                <Loading size="sm" />
+              ) : (
+                <>
+                  <CheckCircle className="w-5 h-5 mr-2" />
+                  Verificar código
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={() => setStep(1)}
+              className="w-full bg-gray-100 text-gray-700 py-3 px-6 rounded-xl hover:bg-gray-200 transition-all duration-200 font-medium"
+            >
+              <ArrowLeft className="w-5 h-5 inline mr-2" />
+              Cambiar número
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Componente para selección de rol después de Google OAuth
+const RoleSelection = ({ onRoleSelected, userInfo }) => {
+  const [selectedRole, setSelectedRole] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleRoleSubmit = async () => {
+    if (!selectedRole) {
+      alert('Por favor selecciona un rol');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await axios.post('/api/auth/google/complete', {
+        code: userInfo.sub,
+        role: selectedRole
+      });
+
+      localStorage.setItem('access_token', response.data.access_token);
+      localStorage.setItem('user_data', JSON.stringify(response.data.user));
+      
+      onRoleSelected(response.data.user);
+    } catch (err) {
+      alert('Error completando registro: ' + (err.response?.data?.detail || 'Error desconocido'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50 flex items-center justify-center px-4">
+      <div className="max-w-md w-full">
+        <div className="bg-white rounded-3xl shadow-xl p-8 border border-green-100">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-green-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+              <img 
+                src={userInfo.picture} 
+                alt={userInfo.name}
+                className="w-12 h-12 rounded-full"
+              />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">¡Bienvenido!</h2>
+            <p className="text-gray-600">Hola {userInfo.name}, selecciona tu rol en PASTO!</p>
+          </div>
+
+          <div className="space-y-4 mb-6">
+            <button
+              onClick={() => setSelectedRole('client')}
+              className={`w-full p-4 rounded-xl border-2 transition-all duration-200 flex items-center space-x-3 ${
+                selectedRole === 'client'
+                  ? 'border-green-500 bg-green-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Home className="w-6 h-6 text-blue-600" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-semibold text-gray-900">Cliente</h3>
+                <p className="text-sm text-gray-600">Solicito servicios de jardinería</p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setSelectedRole('gardener')}
+              className={`w-full p-4 rounded-xl border-2 transition-all duration-200 flex items-center space-x-3 ${
+                selectedRole === 'gardener'
+                  ? 'border-green-500 bg-green-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className="p-2 bg-green-100 rounded-lg">
+                <Leaf className="w-6 h-6 text-green-600" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-semibold text-gray-900">Jardinero</h3>
+                <p className="text-sm text-gray-600">Ofrezco servicios de jardinería</p>
+              </div>
+            </button>
+          </div>
+
+          <button
+            onClick={handleRoleSubmit}
+            disabled={loading || !selectedRole}
+            className="w-full bg-green-600 text-white py-4 px-6 rounded-xl hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-200 disabled:opacity-50 transition-all duration-200 font-medium text-lg flex items-center justify-center"
+          >
+            {loading ? (
+              <Loading size="sm" />
+            ) : (
+              <>
+                Continuar
+                <ChevronRight className="w-5 h-5 ml-2" />
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 const Rating = ({ rating, onRating, readonly = false, size = 'md' }) => {
   const [hovered, setHovered] = useState(0);
   const sizeClass = size === 'sm' ? 'w-4 h-4' : size === 'lg' ? 'w-8 h-8' : 'w-6 h-6';
