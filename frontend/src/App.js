@@ -2037,6 +2037,7 @@ const App = () => {
         )}
       </div>
     </Router>
+    </GoogleOAuthProvider>
   );
 };
 
