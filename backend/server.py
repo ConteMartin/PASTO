@@ -1,10 +1,14 @@
-from fastapi import FastAPI, HTTPException, Depends, status, UploadFile, File
+from fastapi import FastAPI, HTTPException, Depends, status, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 from pymongo import MongoClient
 from pydantic import BaseModel, Field
 from typing import Optional, List
+from authlib.integrations.starlette_client import OAuth
+from twilio.rest import Client as TwilioClient
+from twilio.base.exceptions import TwilioException
 import os
 import uuid
 from datetime import datetime, timedelta
@@ -13,6 +17,7 @@ import jwt
 from enum import Enum
 import base64
 import json
+import re
 
 # Configuración de la aplicación
 app = FastAPI(title="PASTO! API", version="2.0.0")
