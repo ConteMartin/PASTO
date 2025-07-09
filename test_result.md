@@ -164,7 +164,7 @@ TWILIO_VERIFY_SERVICE_SID=your_twilio_verify_service_sid_here
 
 ### **Frontend Environment Variables**
 ```env
-REACT_APP_BACKEND_URL=https://75643702-68a9-4174-9abf-ee5e7b482729.preview.emergentagent.com
+REACT_APP_BACKEND_URL=https://a191cd3d-a014-49cb-98b6-e7c2a4d86dfe.preview.emergentagent.com
 REACT_APP_GOOGLE_CLIENT_ID=your_google_client_id_here
 ```
 
@@ -190,8 +190,8 @@ REACT_APP_GOOGLE_CLIENT_ID=your_google_client_id_here
 ### **To Activate Google OAuth:**
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create OAuth 2.0 credentials
-3. Set authorized origins: `https://75643702-68a9-4174-9abf-ee5e7b482729.preview.emergentagent.com`
-4. Set redirect URIs: `https://75643702-68a9-4174-9abf-ee5e7b482729.preview.emergentagent.com/auth/google`
+3. Set authorized origins: `https://a191cd3d-a014-49cb-98b6-e7c2a4d86dfe.preview.emergentagent.com`
+4. Set redirect URIs: `https://a191cd3d-a014-49cb-98b6-e7c2a4d86dfe.preview.emergentagent.com/auth/google`
 5. Update environment variables:
    - `GOOGLE_CLIENT_ID` (backend)
    - `GOOGLE_CLIENT_SECRET` (backend)

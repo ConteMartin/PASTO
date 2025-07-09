@@ -6,7 +6,7 @@ import string
 from datetime import datetime
 
 class PastoAPITester:
-    def __init__(self, base_url="https://75643702-68a9-4174-9abf-ee5e7b482729.preview.emergentagent.com"):
+    def __init__(self, base_url="https://a191cd3d-a014-49cb-98b6-e7c2a4d86dfe.preview.emergentagent.com"):
         self.base_url = base_url
         self.client_token = None
         self.gardener_token = None
