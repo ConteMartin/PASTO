@@ -754,7 +754,7 @@ const Dashboard = ({ user, onLogout }) => {
                 variant="outline"
                 onClick={handleEstimate}
                 loading={loading}
-                icon={Calculator}
+                icon={DollarSign}
                 className="flex-1"
               >
                 Calcular Precio
