@@ -101,6 +101,10 @@ class NotificationType(str, Enum):
     NEW_SERVICE_AVAILABLE = "new_service_available"
     GARDENER_ON_WAY = "gardener_on_way"
 
+class AuthProvider(str, Enum):
+    EMAIL = "email"
+    GOOGLE = "google"
+
 # Modelos Pydantic
 class UserRegistration(BaseModel):
     email: str
@@ -108,6 +112,17 @@ class UserRegistration(BaseModel):
     full_name: str
     role: UserRole
     phone: Optional[str] = None
+
+class GoogleAuthRequest(BaseModel):
+    code: str
+    role: UserRole
+
+class PhoneVerificationRequest(BaseModel):
+    phone_number: str
+
+class PhoneVerificationCheck(BaseModel):
+    phone_number: str
+    code: str
 
 class UserLogin(BaseModel):
     email: str
