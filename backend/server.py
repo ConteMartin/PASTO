@@ -166,7 +166,6 @@ class GardenerProfile(BaseModel):
     years_experience: int = 0
 
 class ServiceRequest(BaseModel):
-    client_id: str
     service_type: ServiceType
     address: str
     latitude: float
